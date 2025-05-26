@@ -1,0 +1,265 @@
+13_00_00_00   // 0x0  
+13_00_00_00   // 0x4  
+13_01_F0_7F   // 0x8  
+13_01_D1_7F   // 0xc  
+13_0B_00_02   // 0x10 
+93_0B_00_0E   // 0x14 
+13_04_00_00   // 0x18 
+93_84_FB_FF   // 0x1c 
+EF_00_80_00   // 0x20 
+6F_00_40_16   // 0x24 
+13_01_01_FF   // 0x28 
+23_26_11_00   // 0x2c 
+23_24_81_00   // 0x30 
+23_22_91_00   // 0x34 
+33_27_94_00   // 0x38 
+63_14_E0_00   // 0x3c 
+6F_00_80_02   // 0x40 
+EF_00_80_03   // 0x44 
+23_20_31_01   // 0x48 
+03_24_81_00   // 0x4c 
+93_84_F9_FF   // 0x50 
+EF_F0_5F_FD   // 0x54 
+83_29_01_00   // 0x58 
+83_24_41_00   // 0x5c 
+13_84_19_00   // 0x60 
+EF_F0_5F_FC   // 0x64 
+83_20_C1_00   // 0x68 
+03_24_81_00   // 0x6c 
+83_24_41_00   // 0x70 
+13_01_01_01   // 0x74 
+67_80_00_00   // 0x78 
+13_01_01_FF   // 0x7c 
+23_26_11_00   // 0x80 
+23_24_81_00   // 0x84 
+23_22_91_00   // 0x88 
+93_05_04_00   // 0x8c 
+B3_85_65_01   // 0x90 
+93_95_25_00   // 0x94 
+03_AA_05_00   // 0x98 
+93_02_00_00   // 0x9c 
+33_03_04_00   // 0xa0 
+13_03_13_00   // 0xa4 
+33_A7_64_00   // 0xa8 
+63_10_E0_02   // 0xac 
+33_05_63_01   // 0xb0 
+13_15_25_00   // 0xb4 
+03_27_05_00   // 0xb8 
+33_27_EA_00   // 0xbc 
+63_14_E0_00   // 0xc0 
+93_82_12_00   // 0xc4 
+6F_F0_DF_FD   // 0xc8 
+B3_09_54_00   // 0xcc 
+33_05_3B_01   // 0xd0 
+13_15_25_00   // 0xd4 
+03_26_05_00   // 0xd8 
+B3_05_8B_00   // 0xdc 
+93_95_25_00   // 0xe0 
+83_A6_05_00   // 0xe4 
+23_20_D5_00   // 0xe8 
+23_A0_C5_00   // 0xec 
+33_03_04_00   // 0xf0 
+B3_83_04_00   // 0xf4                
+33_27_33_01   // 0xf8 
+B3_A7_79_00   // 0xfc 
+33_77_F7_00   // 0x100
+63_08_E0_06   // 0x104              
+33_05_63_01   // 0x108
+13_15_25_00   // 0x10c
+83_2C_05_00   // 0x110
+33_27_9A_01   // 0x114
+63_16_E0_00   // 0x118
+13_03_13_00   // 0x11c
+6F_F0_9F_FE   // 0x120              
+B3_85_63_01   // 0x124
+93_95_25_00   // 0x128
+03_AD_05_00   // 0x12c
+33_27_AA_01   // 0x130
+63_06_E0_00   // 0x134
+93_83_F3_FF   // 0x138
+6F_F0_9F_FE   // 0x13c             
+33_27_33_01   // 0x140
+B3_A7_79_00   // 0x144
+33_77_F7_00   // 0x148
+63_02_E0_02   // 0x14c
+33_05_63_01   // 0x150
+13_15_25_00   // 0x154
+03_26_05_00   // 0x158
+B3_85_63_01   // 0x15c
+93_95_25_00   // 0x160
+83_A6_05_00   // 0x164
+23_20_D5_00   // 0x168
+23_A0_C5_00   // 0x16c
+6F_F0_9F_F8   // 0x170
+83_20_C1_00   // 0x174
+03_24_81_00   // 0x178
+83_24_41_00   // 0x17c
+13_01_01_01   // 0x180
+67_80_00_00   // 0x184
+13_00_00_00   // 0x188
+13_00_00_00   // 0x18c
+13_00_00_00   // 0x190
+13_00_00_00   // 0x194
+13_00_00_00   // 0x198
+13_00_00_00   // 0x19c
+
+
+
+
+
+
+
+
+//  #########
+//  #  main #
+//  #########
+//  00000013   # 0x0     addi x0, x0, 0
+//  00000013   # 0x4     addi x0, x0, 0
+//  7FF00113   # 0x8     addi sp, x0, 2047   # base address
+//  7FD10113   # 0xc     addi sp, sp, 2045
+//  02000B13   # 0x10    addi s6, x0, 32     # location of array
+//  0E000B93   # 0x14    addi s7, x0, 224    # n: total number to be sorted
+//  
+//  00000413   # 0x18    addi s0, x0, 0      # start = 0
+//  FFFB8493   # 0x1c    addi s1, s7, -1     # end = n-1
+//  008000EF   # 0x20    jal  ra, 8          # jump to quicksort (0x28)
+//  
+//  1640006F   # 0x24    jal  x0, 356        # jump to testing answer (0x188)
+//  
+//  
+//  
+//  #############
+//  # quicksort #
+//  #############
+//  FF010113   # 0x28    addi sp, sp, -16    # store previous $ra $s0 $s1
+//  00112623   # 0x2c    sw   ra, 12(sp)
+//  00812423   # 0x30    sw   s0, 8(sp)
+//  00912223   # 0x34    sw   s1, 4(sp)
+//  
+//  00942733   # 0x38    slt  a4, s0, s1     # check if start<end, true==>to find partition and further sort, false==>return
+//  00E01463   # 0x3c    bne  x0, a4, 8      #   branch to operation (0x44)
+//  0280006F   # 0x40    jal  x0, 40         # exit, jump to restore (0x68)
+//  
+//  038000EF   # 0x44    jal  ra, 56         # jump to find partition (0x7c)
+//  01312023   # 0x48    sw   s3, 0(sp) 
+//  
+//  00812403   # 0x4c    lw   s0, 8(sp)      # operate quicksort(start, p-1)
+//  FFF98493   # 0x50    addi s1, s3, -1     #   end=p-1
+//  FD5FF0EF   # 0x54    jal  ra, -44        #   jump to quick sort for sort(start,p-1) (0x28)
+//  
+//  00012983   # 0x58    lw   s3, 0(sp)
+//  00412483   # 0x5c    lw   s1, 4(sp)      # operate quicksort(p+1,end)
+//  00198413   # 0x60    addi s0, s3, 1      #   start=p+1
+//  FC5FF0EF   # 0x64    jal  ra, -60        #   jump to quick sort for sort(p+1,end) (0x28)
+//  
+//  
+//  00C12083   # 0x68    lw   ra, 12(sp)     # restore previous $ra $s1 $s2
+//  00812403   # 0x6c    lw   s0, 8(sp)
+//  00412483   # 0x70    lw   s1, 4(sp)
+//  01010113   # 0x74    addi sp, sp, 16 
+//  00008067   # 0x78    jalr x0, ra, 0      # return
+//  
+//  
+//  
+//  ##################
+//  # find partition #
+//  ##################
+//  FF010113   # 0x7c    addi sp, sp, -16    # store previous $ra $s0 $s1
+//  00112623   # 0x80    sw   ra, 12(sp)
+//  00812423   # 0x84    sw   s0, 8(sp)
+//  00912223   # 0x88    sw   s1, 4(sp)
+//  
+//  
+//  00040593   # 0x8c    addi a1, s0, 0      # get start value
+//  016585B3   # 0x90    add  a1, a1, s6
+//  00259593   # 0x94    slli a1, a1, 2
+//  0005AA03   # 0x98    lw   s4, 0(a1)      # s4(pivot value) = arr[start]
+//  00000293   # 0x9c    addi t0, x0, 0      # count=0
+//  
+//  00040333   # 0xa0    add  t1, s0, x0     # initialization i=start
+//  00130313   # 0xa4    addi t1, t1, 1      # for loop start:  i++
+//  
+//  0064A733   # 0xa8    slt  a4, s1, t1     #   check if i<=end, true==>end for loop, false==>continue
+//  02E01063   # 0xac    bne  x0, a4, 32     #   branch to find pivotIndex (0xcc)
+//  
+//  01630533   # 0xb0    add  a0, t1, s6     # if: check arr[i] <= pivot value
+//  00251513   # 0xb4    slli a0, a0, 2
+//  00052703   # 0xb8    lw   a4, 0(a0)
+//  00EA2733   # 0xbc    slt  a4, s4, a4     #   skip count++ 
+//  00E01463   # 0xc0    bne  x0, a4, 8      #   branch to return (0xc8)
+//  00128293   # 0xc4    addi t0, t0, 1      # count++
+//  FDDFF06F   # 0xc8    jal  x0, -36        # back to for loop (0xa4)
+//  
+//  005409B3   # 0xcc    add  s3, s0, t0     # pivotIndex = start + count
+//  
+//  013B0533   # 0xd0    add  a0, s6, s3     # get arr[pivotIndex]
+//  00251513   # 0xd4    slli a0, a0, 2
+//  00052603   # 0xd8    lw   a2, 0(a0)
+//  008B05B3   # 0xdc    add  a1, s6, s0     # get arr[start]
+//  00259593   # 0xe0    slli a1, a1, 2
+//  0005A683   # 0xe4    lw   a3, 0(a1)
+//  00D52023   # 0xe8    sw   a3, 0(a0)      # exange value of arr[pivotIndex] and arr[start]
+//  00C5A023   # 0xec    sw   a2, 0(a1)
+//  
+//  
+//  00040333   # 0xf0    add  t1, s0, x0     # i = start
+//  000483B3   # 0xf4    add  t2, s1, x0     # j = end
+//  
+//                                           # while loop.1
+//  01332733   # 0xf8    slt  a4, t1, s3     #   check if i<pivotIndex
+//  0079A7B3   # 0xfc    slt  a5, s3, t2     #   check if pivotIndex<j
+//  00F77733   # 0x100   and  a4, a4, a5     #   i<pivotIndex<j
+//  06E00863   # 0x104   beq  x0, a4, 112    # end while loop.1 (0x174)
+//  
+//                                           # while loop.2
+//  01630533   # 0x108   add  a0, t1, s6     #   check arr[i] <= pivot value
+//  00251513   # 0x10c   slli a0, a0, 2
+//  00052C83   # 0x110   lw   s9, 0(a0)
+//  019A2733   # 0x114   slt  a4, s4, s9     #   skip i++ 
+//  00E01663   # 0x118   bne  x0, a4, 12     #   end while loop.2 (0x124)
+//  00130313   # 0x11c   addi t1, t1, 1      #   i++
+//  FE9FF06F   # 0x120   jal  x0, -24        #   back to while loop.2 (0x108)
+//  
+//                                           # while loop.3
+//  016385B3   # 0x124   add  a1, t2, s6     #   check arr[j] > pivot value
+//  00259593   # 0x128   slli a1, a1, 2
+//  0005AD03   # 0x12c   lw   s10, 0(a1)
+//  01AA2733   # 0x130   slt  a4, s4, s10    #   skip j-- 
+//  00E00663   # 0x134   beq  x0, a4, 12     #   end while loop.3 (0x140)
+//  FFF38393   # 0x138   addi t2, t2, -1     #   j--
+//  FE9FF06F   # 0x13c   jal  x0, -24        #   back to while loop.3 (0x124)
+//  
+//  
+//                                           # check if need exange
+//  01332733   # 0x140   slt  a4, t1, s3     #   check if i<pivotIndex
+//  0079A7B3   # 0x144   slt  a5, s3, t2     #   check if pivotIndex<j
+//  00F77733   # 0x148   and  a4, a4, a5     #   i<pivotIndex<j
+//  02E00263   # 0x14c   beq  x0, a4, 36     # skip exange (0x170)
+//  
+//  
+//  01630533   # 0x150   add  a0, t1, s6     # get arr[i]
+//  00251513   # 0x154   slli a0, a0, 2
+//  00052603   # 0x158   lw   a2, 0(a0)
+//  016385B3   # 0x15c   add  a1, t2, s6     # get arr[i]
+//  00259593   # 0x160   slli a1, a1, 2
+//  0005A683   # 0x164   lw   a3, 0(a1)
+//  00D52023   # 0x168   sw   a3, 0(a0)      # exange value of arr[pivotIndex] and arr[start]
+//  00C5A023   # 0x16c   sw   a2, 0(a1)
+//  
+//  
+//  F89FF06F   # 0x170   jal  x0, -120       # back to while loop.1 (0xf8)
+//  
+//  
+//  00C12083   # 0x174   lw   ra, 12(sp)
+//  00812403   # 0x178   lw   s0, 8(sp)
+//  00412483   # 0x17c   lw   s1, 4(sp)
+//  01010113   # 0x180   addi sp, sp, 16     # store previous $ra $s0 $s1
+//  00008067   # 0x184   jalr x0, ra, 0      # return
+//  
+//  
+//  00000013   # 0x188   addi x0, x0, 0
+//  00000013   # 0x18c   addi x0, x0, 0
+//  00000013   # 0x190   addi x0, x0, 0
+//  00000013   # 0x194   addi x0, x0, 0
+//  00000013   # 0x198   addi x0, x0, 0
+//  00000013   # 0x19c   addi x0, x0, 0

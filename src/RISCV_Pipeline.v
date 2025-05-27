@@ -102,7 +102,6 @@ wire zero;
 
 // Branch target calculation
 reg [31:0] branch_jal_addr;
-reg [31:0] jalr_addr;
 
 //EX
 wire [31:0] rs1_val, rs2_val,EX_op1, EX_op2;
@@ -143,6 +142,7 @@ always@(*) begin
     IF_pc_w = PC_reg; // Update IF stage PC
     IF_inst_w = {ICACHE_rdata[7:0],ICACHE_rdata[15:8],ICACHE_rdata[23:16],ICACHE_rdata[31:24]}; // Read instruction from I-cache
 
+
     if(stall) begin
         PC_w = PC_reg; // Hold PC if stalled
         IF_pc_w = IF_pc_r;
@@ -155,7 +155,7 @@ always@(*) begin
     end
 
     else if (ID_jalr_r) begin
-        PC_w = EX_out_w;
+        PC_w = alu_result;
         IF_valid_w = 1'b0;
     end
 end
@@ -211,7 +211,7 @@ always@(posedge clk) begin
 end
 
 always@(posedge clk) begin
-    if (!rst_n || (cnt_r != 2'd0)||ID_jalr_r) begin
+    if (!rst_n || (cnt_r != 2'd0)) begin
         ID_rs1_r <= 32'd0;
         ID_rs2_r <= 32'd0;
         ID_rs1_addr_r <= 5'd0; // Reset rs1 address
@@ -245,8 +245,8 @@ end
 
 always@(*)begin
 
-    ID_rs1_w = (jal)?  branch_jal_addr: RF_r[{IF_inst_r[19:15]}];
-    ID_rs2_w = (jal)?  32'd0: RF_r[{IF_inst_r[24:20]}];
+    ID_rs1_w = (jal)?  IF_pc_r: RF_r[{IF_inst_r[19:15]}];
+    ID_rs2_w = (jal)?  32'd4: RF_r[{IF_inst_r[24:20]}];
     ID_rs1_addr_w = (jal)? 5'd0:IF_inst_r[19:15];
     ID_rs2_addr_w = (jal)? 5'd0:IF_inst_r[24:20];
     ID_rd_w = IF_inst_r[11:7]; 
@@ -273,6 +273,21 @@ always@(*)begin
         ID_ALU_src_w = ID_ALU_src_r;
         ID_alu_ctrl_w = ID_alu_ctrl_r;
         ID_jalr_w = ID_jalr_r;
+    end
+
+    else if (ID_jalr_r) begin
+        ID_rs1_w = 32'd0;
+        ID_rs2_w = 32'd0;
+        ID_rs1_addr_w = 5'd0; // Reset rs1 address
+        ID_rs2_addr_w = 5'd0; // Reset rs2 address
+        ID_rd_w = 5'd0;
+        ID_imm_w = 32'd0;
+        ID_mem_to_reg_w = 1'b0;
+        ID_mem_wen_D_w = 1'b0;
+        ID_Reg_write_w = 1'b0;
+        ID_ALU_src_w = 1'b0;
+        ID_alu_ctrl_w = 4'd7; 
+        ID_jalr_w = 1'b0;
     end
 
 end
@@ -330,6 +345,7 @@ always@(*) begin
             Reg_write = 1;
             ALU_src   = 1;
             immediate = {{21{IF_inst_r[31]}},IF_inst_r[30:25],IF_inst_r[24:21],IF_inst_r[20]};
+            alu_ctrl    = 4'd0;
         end  
 
         // S:sw
@@ -352,6 +368,7 @@ always@(*) begin
             jal       = 1;
             Reg_write = 1;
             immediate = {{12{IF_inst_r[31]}},IF_inst_r[19:12],IF_inst_r[20],IF_inst_r[30:21],1'b0};
+            alu_ctrl    = 4'd0;
         end
 
     endcase

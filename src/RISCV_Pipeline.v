@@ -91,6 +91,7 @@ reg [31:0] ID_rs1_w,ID_rs1_r, ID_rs2_w,ID_rs2_r,ID_imm_w,ID_imm_r;
 reg [4:0]  ID_rs1_addr_w,ID_rs1_addr_r,ID_rs2_addr_w,ID_rs2_addr_r,ID_rd_w,ID_rd_r;
 reg        ID_mem_to_reg_w,ID_mem_to_reg_r, ID_mem_wen_D_w,ID_mem_wen_D_r, ID_Reg_write_w,ID_Reg_write_r, ID_ALU_src_w,ID_ALU_src_r;
 reg [3:0]  ID_alu_ctrl_w,ID_alu_ctrl_r;
+reg        ID_jalr_w,ID_jalr_r;
 
 // Hazard detection
 wire hazard;
@@ -153,8 +154,8 @@ always@(*) begin
         IF_valid_w = 1'b0;
     end
 
-    else if (jalr) begin
-        PC_w = jalr_addr;
+    else if (ID_jalr_r) begin
+        PC_w = EX_out_w;
         IF_valid_w = 1'b0;
     end
 end
@@ -210,7 +211,7 @@ always@(posedge clk) begin
 end
 
 always@(posedge clk) begin
-    if (!rst_n || (cnt_r != 2'd0)) begin
+    if (!rst_n || (cnt_r != 2'd0)||ID_jalr_r) begin
         ID_rs1_r <= 32'd0;
         ID_rs2_r <= 32'd0;
         ID_rs1_addr_r <= 5'd0; // Reset rs1 address
@@ -222,6 +223,7 @@ always@(posedge clk) begin
         ID_Reg_write_r <= 1'b0;
         ID_ALU_src_r <= 1'b0;
         ID_alu_ctrl_r <= 4'd7; 
+        ID_jalr_r <= 1'b0;
     end 
     
     else begin
@@ -236,18 +238,18 @@ always@(posedge clk) begin
         ID_Reg_write_r <= ID_Reg_write_w; // Update Reg write flag
         ID_ALU_src_r <= ID_ALU_src_w; // Update ALU source flag
         ID_alu_ctrl_r <= ID_alu_ctrl_w; // Update ALU control signal
+        ID_jalr_r <= ID_jalr_w;
     end
 
 end
 
 always@(*)begin
 
-    ID_rs1_w = (jal)?  branch_jal_addr:
-               (jalr)? jalr_addr :RF_r[{IF_inst_r[19:15]}];
-    ID_rs2_w = (jal|jalr)?  32'd0 : RF_r[{IF_inst_r[24:20]}];
-    ID_rs1_addr_w = (jal|jalr)? 5'd0:IF_inst_r[19:15];
-    ID_rs2_addr_w = (jal|jalr)? 5'd0:IF_inst_r[24:20];
-    ID_rd_w = IF_inst_r[11:7];
+    ID_rs1_w = (jal)?  branch_jal_addr: RF_r[{IF_inst_r[19:15]}];
+    ID_rs2_w = (jal)?  32'd0: RF_r[{IF_inst_r[24:20]}];
+    ID_rs1_addr_w = (jal)? 5'd0:IF_inst_r[19:15];
+    ID_rs2_addr_w = (jal)? 5'd0:IF_inst_r[24:20];
+    ID_rd_w = IF_inst_r[11:7]; 
 
     //decode
     ID_imm_w = immediate;
@@ -256,6 +258,7 @@ always@(*)begin
     ID_Reg_write_w = Reg_write;
     ID_ALU_src_w = ALU_src;
     ID_alu_ctrl_w = alu_ctrl;
+    ID_jalr_w = jalr;
 
     if(stall) begin
         ID_rs1_w = ID_rs1_r;
@@ -269,6 +272,7 @@ always@(*)begin
         ID_Reg_write_w = ID_Reg_write_r;
         ID_ALU_src_w = ID_ALU_src_r;
         ID_alu_ctrl_w = ID_alu_ctrl_r;
+        ID_jalr_w = ID_jalr_r;
     end
 
 end
@@ -324,6 +328,7 @@ always@(*) begin
         7'b1100111: begin
             jalr      = 1;
             Reg_write = 1;
+            ALU_src   = 1;
             immediate = {{21{IF_inst_r[31]}},IF_inst_r[30:25],IF_inst_r[24:21],IF_inst_r[20]};
         end  
 
@@ -361,7 +366,6 @@ comparator cpr(
 // Branch address calculation
 always@(*) begin
     branch_jal_addr = IF_pc_r + immediate;
-    jalr_addr = ID_rs1_w + immediate;
 end
 
 ////////////////////////// EX Stage //////////////////////////

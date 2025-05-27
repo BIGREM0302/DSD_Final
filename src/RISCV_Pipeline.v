@@ -116,6 +116,7 @@ reg [1:0] forwardA, forwardB;
 
 //MEM
 wire [31:0] MEM_alu_out;
+reg [31:0] MEM_alu_out_real_w,MEM_alu_out_real_r;
 assign MEM_alu_out = EX_out_r;
 
 wire [31:0] MEM_wdata;
@@ -127,7 +128,7 @@ reg        MEM_mem_to_reg_w, MEM_mem_to_reg_r,MEM_Reg_write_w, MEM_Reg_write_r;
 
 //WB
 wire [31:0] WB_alu_out;
-assign WB_alu_out = (MEM_mem_to_reg_r)? MEM_rdata_r : MEM_alu_out; // Choose between memory read data and ALU output
+assign WB_alu_out = (MEM_mem_to_reg_r)? MEM_rdata_r : MEM_alu_out_real_r; // Choose between memory read data and ALU output
 
 // Register file
 reg [31:0] RF_r [0:31]; 
@@ -444,12 +445,14 @@ assign DCACHE_addr = MEM_alu_out[31:2]; // Address for D-cache
 assign DCACHE_wdata = {MEM_wdata[7:0],MEM_wdata[15:8],MEM_wdata[23:16],MEM_wdata[31:24]}; // Data to write to D-cache
 
 always@(*) begin
+    MEM_alu_out_real_w = MEM_alu_out;
     MEM_rdata_w = {DCACHE_rdata[7:0],DCACHE_rdata[15:8],DCACHE_rdata[23:16],DCACHE_rdata[31:24]}; // Data read from D-cache
     MEM_rd_w = EX_rd_r; // Forward rd from EX stage
     MEM_mem_to_reg_w = EX_mem_to_reg_r; // Forward mem_to_reg flag from EX stage
     MEM_Reg_write_w = EX_Reg_write_r; // Forward Reg write flag from EX stage
 
     if(stall) begin
+        MEM_alu_out_real_w = MEM_alu_out_real_r;
         MEM_rdata_w = MEM_rdata_r;
         MEM_rd_w = MEM_rd_r;
         MEM_mem_to_reg_w = MEM_mem_to_reg_r;
@@ -461,6 +464,7 @@ end
 always@(posedge clk) begin
     if (!rst_n) begin
         MEM_rdata_r <= 32'd0; // Reset memory read data
+        MEM_alu_out_real_r <= 32'd0;
         MEM_rd_r <= 5'd0; // Reset rd
         MEM_mem_to_reg_r <= 1'b0; // Reset mem_to_reg flag
         MEM_Reg_write_r <= 1'b0; // Reset Reg write flag
@@ -468,6 +472,7 @@ always@(posedge clk) begin
     
     else begin
         MEM_rdata_r <= MEM_rdata_w; // Update memory read data
+        MEM_alu_out_real_r <= MEM_alu_out_real_w;
         MEM_rd_r <= MEM_rd_w; // Update rd
         MEM_mem_to_reg_r <= MEM_mem_to_reg_w; // Update mem_to_reg flag
         MEM_Reg_write_r <= MEM_Reg_write_w; // Update Reg write flag

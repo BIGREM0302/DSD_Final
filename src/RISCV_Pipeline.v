@@ -84,6 +84,7 @@ reg    Reg_write;
 reg    mem_to_reg;
 reg    mem_wen_D;
 reg    bne;
+reg    lw;
 reg    [31:0] immediate;
 reg    [3:0] alu_ctrl;
 
@@ -92,6 +93,7 @@ reg [4:0]  ID_rs1_addr_w,ID_rs1_addr_r,ID_rs2_addr_w,ID_rs2_addr_r,ID_rd_w,ID_rd
 reg        ID_mem_to_reg_w,ID_mem_to_reg_r, ID_mem_wen_D_w,ID_mem_wen_D_r, ID_Reg_write_w,ID_Reg_write_r, ID_ALU_src_w,ID_ALU_src_r;
 reg [3:0]  ID_alu_ctrl_w,ID_alu_ctrl_r;
 reg        ID_jalr_w,ID_jalr_r;
+reg        ID_lw_w,ID_lw_r;
 
 // Hazard detection
 wire hazard;
@@ -187,16 +189,16 @@ always@(posedge clk) begin
 end
 
 ////////////////////////// ID Stage //////////////////////////
-assign hazard = ID_mem_to_reg_r && ((ID_rs1_addr_w == ID_rd_r) || (ID_rs2_addr_w == ID_rd_r));
+assign hazard = ID_lw_r && ((ID_rs1_addr_w == ID_rd_r) || (ID_rs2_addr_w == ID_rd_r));
 
 always@(*) begin
     cnt_w = cnt_r; // Default to hold the counter value
-    if(cnt_r == 2'd3) begin
-        cnt_w = 2'd0; // Reset counter if it reaches 3
+    if(cnt_r == 2'd1) begin
+        cnt_w = 2'd0; // Reset counter if it reaches 1
     end
 
     else if(cnt_r != 2'd0 || hazard) begin
-        cnt_w = cnt_r + 2'd1; // Increment counter if not stalled or hazard detected
+        cnt_w = 2'd1; // Increment counter if not stalled or hazard detected
     end
 end
 
@@ -224,6 +226,7 @@ always@(posedge clk) begin
         ID_ALU_src_r <= 1'b0;
         ID_alu_ctrl_r <= 4'd7; 
         ID_jalr_r <= 1'b0;
+        ID_lw_r <= 1'b0;
     end 
     
     else begin
@@ -239,6 +242,7 @@ always@(posedge clk) begin
         ID_ALU_src_r <= ID_ALU_src_w; // Update ALU source flag
         ID_alu_ctrl_r <= ID_alu_ctrl_w; // Update ALU control signal
         ID_jalr_r <= ID_jalr_w;
+        ID_lw_r <= ID_lw_w;
     end
 
 end
@@ -264,6 +268,7 @@ always@(*)begin
     ID_ALU_src_w = ALU_src;
     ID_alu_ctrl_w = alu_ctrl;
     ID_jalr_w = jalr;
+    ID_lw_w = lw;
 
     if(stall) begin
         ID_rs1_w = ID_rs1_r;
@@ -278,6 +283,7 @@ always@(*)begin
         ID_ALU_src_w = ID_ALU_src_r;
         ID_alu_ctrl_w = ID_alu_ctrl_r;
         ID_jalr_w = ID_jalr_r;
+        ID_lw_w = ID_lw_r;
     end
 
     else if (ID_jalr_r) begin
@@ -293,6 +299,7 @@ always@(*)begin
         ID_ALU_src_w = 1'b0;
         ID_alu_ctrl_w = 4'd7; 
         ID_jalr_w = 1'b0;
+        ID_lw_w = 1'b0;
     end
 
 end
@@ -310,8 +317,8 @@ always@(*) begin
     bne         = 0;
     immediate   = 32'd0;
     alu_ctrl    = 4'd7;
+    lw          = 0;
 
-    // 0=ADD,1=SUB,2=AND,3=OR,4=XOR,5=SLL,6=SRL,7=SRA,8=SLT
 
     case(IF_inst_r[6:0])  // R: add,sub,and,or,xor,slli,srai,srli,slt  I:addi,andi,ori,xori,slti,lw,jalr  S:sw  B:beq,bne  J:jal
     
@@ -342,6 +349,7 @@ always@(*) begin
             Reg_write  = 1;
             immediate  = {{21{IF_inst_r[31]}},IF_inst_r[30:25],IF_inst_r[24:21],IF_inst_r[20]};
             alu_ctrl   = 4'd0;
+            lw         = 1;
         end       
 
         // I:jalr

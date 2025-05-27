@@ -95,6 +95,7 @@ reg [3:0]  ID_alu_ctrl_w,ID_alu_ctrl_r;
 reg        ID_jalr_w,ID_jalr_r;
 reg        ID_lw_w,ID_lw_r;
 reg [31:0] ID_pc_w,ID_pc_r;
+reg [31:0] ID_rs1_br,ID_rs2_br;
 
 // Hazard detection
 wire hazard;
@@ -108,7 +109,7 @@ reg [31:0] branch_jal_addr;
 
 //EX
 wire [31:0] rs1_val, rs2_val,EX_op1, EX_op2;
-reg  [31:0] EX_out_w, EX_out_r;
+reg  signed [31:0] EX_out_w, EX_out_r;
 reg  [31:0] EX_rs2_w, EX_rs2_r;
 reg   [4:0] EX_rd_w, EX_rd_r;
 reg         EX_mem_to_reg_w,EX_mem_to_reg_r, EX_mem_wen_D_w, EX_mem_wen_D_r,EX_Reg_write_w, EX_Reg_write_r;
@@ -255,6 +256,14 @@ always@(*)begin
 
     ID_rs2_w = (jal)?  32'd4 :
                (IF_inst_r[24:20] == MEM_rd_r && MEM_Reg_write_r && MEM_rd_r != 5'd0)? WB_alu_out : RF_r[{IF_inst_r[24:20]}] ;
+    
+    ID_rs1_br = (IF_inst_r[19:15] == ID_rd_r && ID_Reg_write_r && ID_rd_r != 5'd0)? EX_out_w : 
+                (IF_inst_r[19:15] == EX_rd_r && EX_Reg_write_r && EX_rd_r != 5'd0)? MEM_alu_out:
+                (IF_inst_r[19:15] == MEM_rd_r && MEM_Reg_write_r && MEM_rd_r != 5'd0)? WB_alu_out : RF_r[{IF_inst_r[19:15]}];
+
+    ID_rs2_br = (IF_inst_r[24:20] == ID_rd_r && ID_Reg_write_r && ID_rd_r != 5'd0)? EX_out_w : 
+                (IF_inst_r[24:20] == EX_rd_r && EX_Reg_write_r && EX_rd_r != 5'd0)? MEM_alu_out:
+                (IF_inst_r[24:20] == MEM_rd_r && MEM_Reg_write_r && MEM_rd_r != 5'd0)? WB_alu_out : RF_r[{IF_inst_r[24:20]}];
                
     ID_rs1_addr_w = (jal)? 5'd0:IF_inst_r[19:15];
     ID_rs2_addr_w = (jal)? 5'd0:IF_inst_r[24:20];
@@ -389,8 +398,8 @@ always@(*) begin
 end
 
 comparator cpr(
-    .data1(ID_rs1_w),
-    .data2(ID_rs2_w),
+    .data1(ID_rs1_br),
+    .data2(ID_rs2_br),
     .zero(zero)
 );
 
@@ -459,7 +468,7 @@ always@(*) begin
     EX_mem_to_reg_w = ID_mem_to_reg_r; // Forward mem_to_reg flag from ID stage
     EX_mem_wen_D_w = ID_mem_wen_D_r; // Forward mem write enable flag from ID stage
     EX_Reg_write_w = ID_Reg_write_r; // Forward Reg write flag from ID stage
-    EX_out_w = (ID_jalr_r)? ID_pc_r + 32'd4 : alu_result; // ALU result
+    EX_out_w = (ID_jalr_r)? $signed(ID_pc_r) + $signed(32'd4) : alu_result; // ALU result
     EX_rs2_w = rs2_val; // Forward rs2 value
 
     if(stall) begin

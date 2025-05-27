@@ -149,7 +149,7 @@ always@(*) begin
         IF_inst_w = IF_inst_r; // Hold instruction if stalled
     end 
 
-    else if ((bne&(!zero))|(branch&zero)|jal) begin
+    else if ((bne & ~zero)| (branch & zero)| jal) begin
         PC_w = branch_jal_addr;
         IF_valid_w = 1'b0;
     end

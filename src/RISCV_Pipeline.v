@@ -387,14 +387,14 @@ always @(*) begin
 end
 
 assign rs1_val = (forwardA==2'b00) ? ID_rs1_r : 
-                (forwardA==2'b01) ? WB_alu_out : 
-                (forwardA==2'b10) ? MEM_alu_out : 32'd0;
+                 (forwardA==2'b01) ? WB_alu_out : 
+                 (forwardA==2'b10) ? MEM_alu_out : 32'd0;
 
 assign rs2_val = (forwardB==2'b00) ? ID_rs2_r :
-                (forwardB==2'b01) ? WB_alu_out : 
-                (forwardB==2'b10) ? MEM_alu_out : 32'd0;
+                 (forwardB==2'b01) ? WB_alu_out : 
+                 (forwardB==2'b10) ? MEM_alu_out : 32'd0;
 
-assign EX_op1 = (ID_ALU_src_r) ? ID_imm_r : rs1_val; 
+assign EX_op1 = rs1_val; 
 assign EX_op2 = (ID_ALU_src_r) ? ID_imm_r : rs2_val; 
 
 always@(posedge clk) begin

@@ -171,10 +171,10 @@ always@(posedge clk) begin
         IF_inst_r <= {{25{1'b0}},{7'b0010011}};
     end
 
-    else if( cnt_w != 2'd0) begin
+    else if(cnt_w != 2'd0) begin
         PC_reg <= PC_reg; // Update PC if not stalled
-        IF_pc_r <= IF_pc_w;
-        IF_inst_r <= {{25{1'b0}},{7'b0010011}};
+        IF_pc_r <= IF_pc_r;
+        IF_inst_r <= IF_inst_r;
     end
 
     else begin
@@ -185,6 +185,7 @@ always@(posedge clk) begin
 end
 
 ////////////////////////// ID Stage //////////////////////////
+assign hazard = ID_mem_to_reg_r && ((ID_rs1_addr_w == ID_rd_r) || (ID_rs2_addr_w == ID_rd_r));
 
 always@(*) begin
     cnt_w = cnt_r; // Default to hold the counter value
@@ -208,7 +209,7 @@ always@(posedge clk) begin
 end
 
 always@(posedge clk) begin
-    if (!rst_n) begin
+    if (!rst_n || (cnt_r != 2'd0)) begin
         ID_rs1_r <= 32'd0;
         ID_rs2_r <= 32'd0;
         ID_rs1_addr_r <= 5'd0; // Reset rs1 address

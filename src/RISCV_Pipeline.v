@@ -245,8 +245,12 @@ end
 
 always@(*)begin
 
-    ID_rs1_w = (jal)?  IF_pc_r: RF_r[{IF_inst_r[19:15]}];
-    ID_rs2_w = (jal)?  32'd4: RF_r[{IF_inst_r[24:20]}];
+
+    ID_rs1_w = (jal)?  IF_pc_r :
+               (IF_inst_r[19:15] == MEM_rd_r && MEM_Reg_write_r && MEM_rd_r != 5'd0)? WB_alu_out : RF_r[{IF_inst_r[19:15]}] ;
+
+    ID_rs2_w = (jal)?  32'd4 :
+               (IF_inst_r[24:20] == MEM_rd_r && MEM_Reg_write_r && MEM_rd_r != 5'd0)? WB_alu_out : RF_r[{IF_inst_r[24:20]}] ;
     ID_rs1_addr_w = (jal)? 5'd0:IF_inst_r[19:15];
     ID_rs2_addr_w = (jal)? 5'd0:IF_inst_r[24:20];
     ID_rd_w = IF_inst_r[11:7]; 

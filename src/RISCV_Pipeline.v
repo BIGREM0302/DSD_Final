@@ -99,7 +99,7 @@ reg [31:0] ID_rs1_br,ID_rs2_br;
 
 // Hazard detection
 wire hazard;
-reg [1:0] cnt_w, cnt_r;
+reg  cnt_w, cnt_r;
 
 //zero
 wire zero;
@@ -141,7 +141,7 @@ reg [31:0] RF_r [0:31];
 
 ////////////////////////// IF Stage //////////////////////////
 always@(*) begin
-    PC_w = PC_reg + 32'd4; // Increment PC by 4 for next instruction
+    PC_w = $signed(PC_reg) + $signed(32'd4); // Increment PC by 4 for next instruction
     IF_valid_w = 1'b1; // Set IF stage valid flag
     IF_pc_w = PC_reg; // Update IF stage PC
     IF_inst_w = {ICACHE_rdata[7:0],ICACHE_rdata[15:8],ICACHE_rdata[23:16],ICACHE_rdata[31:24]}; // Read instruction from I-cache
@@ -177,7 +177,7 @@ always@(posedge clk) begin
         IF_inst_r <= {{25{1'b0}},{7'b0010011}};
     end
 
-    else if(cnt_w != 2'd0) begin
+    else if(cnt_w) begin
         PC_reg <= PC_reg; // Update PC if not stalled
         IF_pc_r <= IF_pc_r;
         IF_inst_r <= IF_inst_r;
@@ -195,19 +195,19 @@ assign hazard = ID_lw_r && ((ID_rs1_addr_w == ID_rd_r) || (ID_rs2_addr_w == ID_r
 
 always@(*) begin
     cnt_w = cnt_r; // Default to hold the counter value
-    if(cnt_r == 2'd1) begin
-        cnt_w = 2'd0; // Reset counter if it reaches 1
+    if(cnt_r) begin
+        cnt_w = 1'b0; // Reset counter if it reaches 1
     end
 
-    else if(cnt_r != 2'd0 || hazard) begin
-        cnt_w = 2'd1; // Increment counter if not stalled or hazard detected
+    else if(hazard) begin
+        cnt_w = 1'b1; // Increment counter if not stalled or hazard detected
     end
 end
 
 
 always@(posedge clk) begin
     if (!rst_n) begin
-        cnt_r <= 2'd0; // Reset counter
+        cnt_r <= 1'b0; // Reset counter
     end 
     else begin
         cnt_r <= cnt_w; // Reset counter when not stalled
@@ -215,7 +215,7 @@ always@(posedge clk) begin
 end
 
 always@(posedge clk) begin
-    if (!rst_n || (cnt_r != 2'd0)) begin
+    if (!rst_n || cnt_w) begin
         ID_rs1_r <= 32'd0;
         ID_rs2_r <= 32'd0;
         ID_rs1_addr_r <= 5'd0; // Reset rs1 address
@@ -405,7 +405,7 @@ comparator cpr(
 
 // Branch address calculation
 always@(*) begin
-    branch_jal_addr = IF_pc_r + immediate;
+    branch_jal_addr = $signed(IF_pc_r) + $signed(immediate);
 end
 
 ////////////////////////// EX Stage //////////////////////////

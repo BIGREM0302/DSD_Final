@@ -12,17 +12,17 @@ module ALU(
     always @(*) begin
         case (alu_ctrl) // synopsys parallel_case full_case
             4'd0:       temp = data1 + data2;
-            4'd1,4'd8:  temp = data1 - data2;
-            4'd2:       temp = data1 & data2;
-            4'd3:       temp = data1 | data2;
+            4'd3,4'd2:  temp = data1 - data2;
+            4'd7:       temp = data1 & data2;
+            4'd6:       temp = data1 | data2;
             4'd4:       temp = data1 ^ data2;
-            4'd5:       temp = data1 << data2[4:0];
-            4'd6:       temp = data1 >> data2[4:0];
-            4'd7:       temp = data1 >>> data2[4:0];
+            4'd1:       temp = data1 << data2[4:0];
+            4'd5:       temp = data1 >> data2[4:0];
+            4'd8:       temp = data1 >>> data2[4:0];
         endcase
     end
 
-    assign alu_calc = (alu_ctrl == 4'd8)?{31'd0,temp[31]}:temp;
+    assign alu_calc = (alu_ctrl == 4'd2)?{31'd0,temp[31]}:temp;
 
 endmodule
 
@@ -132,31 +132,31 @@ reg    [31:0] immediate;
 reg    [3:0] alu_ctrl;
 
 reg [31:0] ID_rs1_w,ID_rs1_r, ID_rs2_w,ID_rs2_r,ID_imm_w,ID_imm_r;
-reg [4:0]  ID_rd_w,ID_rd_r;
+reg [4:0]  ID_rs1_addr_w,ID_rs1_addr_r,ID_rs2_addr_w,ID_rs2_addr_r,ID_rd_w,ID_rd_r;
 reg        ID_mem_to_reg_w,ID_mem_to_reg_r, ID_mem_wen_D_w,ID_mem_wen_D_r, ID_Reg_write_w,ID_Reg_write_r, ID_ALU_src_w,ID_ALU_src_r;
 reg [3:0]  ID_alu_ctrl_w,ID_alu_ctrl_r;
-reg        ID_branch_w,ID_branch_r, ID_jal_w,ID_jal_r, ID_jalr_w,ID_jalr_r;
 
 
 always@(posedge clk) begin
     if (!rst_n) begin
         ID_rs1_r <= 32'd0;
         ID_rs2_r <= 32'd0;
+        ID_rs1_addr_r <= 5'd0; // Reset rs1 address
+        ID_rs2_addr_r <= 5'd0; // Reset rs2 address
         ID_rd_r <= 5'd0;
         ID_imm_r <= 32'd0;
         ID_mem_to_reg_r <= 1'b0;
         ID_mem_wen_D_r <= 1'b0;
         ID_Reg_write_r <= 1'b0;
         ID_ALU_src_r <= 1'b0;
-        ID_alu_ctrl_r <= 4'd2;
-        ID_branch_r <= 1'b0;
-        ID_jal_r <= 1'b0;
-        ID_jalr_r <= 1'b0;  
+        ID_alu_ctrl_r <= 4'd7; 
     end 
     
     else begin
         ID_rs1_r <= ID_rs1_w; // Update rs1
         ID_rs2_r <= ID_rs2_w; // Update rs2
+        ID_rs1_addr_r <= ID_rs1_addr_w; // Update rs1 address
+        ID_rs2_addr_r <= ID_rs2_addr_w; // Update rs2 address
         ID_rd_r <= ID_rd_w; // Update rd
         ID_imm_r <= ID_imm_w; // Update immediate value
         ID_mem_to_reg_r <= ID_mem_to_reg_w; // Update mem_to_reg flag
@@ -164,9 +164,6 @@ always@(posedge clk) begin
         ID_Reg_write_r <= ID_Reg_write_w; // Update Reg write flag
         ID_ALU_src_r <= ID_ALU_src_w; // Update ALU source flag
         ID_alu_ctrl_r <= ID_alu_ctrl_w; // Update ALU control signal
-        ID_branch_r <= ID_branch_w; // Update branch flag
-        ID_jal_r <= ID_jal_w; // Update jal flag
-        ID_jalr_r <= ID_jalr_w; // Update jalr flag
     end
 
 end
@@ -175,6 +172,8 @@ always@(*)begin
 
     ID_rs1_w = RF_r[{IF_inst_r[19:15]}];
     ID_rs2_w = RF_r[{IF_inst_r[24:20]}];
+    ID_rs1_addr_w = IF_inst_r[19:15];
+    ID_rs2_addr_w = IF_inst_r[24:20];
     ID_rd_w = IF_inst_r[11:7];
 
     //decode
@@ -184,13 +183,12 @@ always@(*)begin
     ID_Reg_write_w = Reg_write;
     ID_ALU_src_w = ALU_src;
     ID_alu_ctrl_w = alu_ctrl;
-    ID_branch_w = branch;
-    ID_jal_w = jal;
-    ID_jalr_w = jalr;
 
     if(stall) begin
         ID_rs1_w = ID_rs1_r;
         ID_rs2_w = ID_rs2_r;
+        ID_rs1_addr_w = ID_rs1_addr_r;
+        ID_rs2_addr_w = ID_rs2_addr_r;
         ID_rd_w = ID_rd_r;
         ID_imm_w = ID_imm_r;
         ID_mem_to_reg_w = ID_mem_to_reg_r;
@@ -198,9 +196,6 @@ always@(*)begin
         ID_Reg_write_w = ID_Reg_write_r;
         ID_ALU_src_w = ID_ALU_src_r;
         ID_alu_ctrl_w = ID_alu_ctrl_r;
-        ID_branch_w = ID_branch_r;
-        ID_jal_w = ID_jal_r;
-        ID_jalr_w = ID_jalr_r;
     end
 
 end
@@ -217,47 +212,31 @@ always@(*) begin
     mem_wen_D   = 0;
     bne         = 0;
     immediate   = 32'd0;
-    alu_ctrl    = 4'b0010;
+    alu_ctrl    = 4'd7;
 
     // 0=ADD,1=SUB,2=AND,3=OR,4=XOR,5=SLL,6=SRL,7=SRA,8=SLT
 
     case(inst[6:0])  // R: add,sub,and,or,xor,slli,srai,srli,slt  I:addi,andi,ori,xori,slti,lw,jalr  S:sw  B:beq,bne  J:jal
     
-        // R: add,sub,and,or,xor,slli,srli,srai,slt
-        7'b0110011: begin
-            Reg_write  = 1;
-            immediate  = {27'd0,IF_inst_r[4:0]}; // for shift
+        // R: add,sub,and,or,xor,slt
+        7'b0110011: begin   
+            Reg_write   = 1;
+            alu_ctrl    = (IF_inst_r[30])? 4'd3 : {1'b0, IF_inst_r[14:12]};
         end
 
-        // I:addi
-        7'b: begin
-            
-            immediate  = {{21{IF_inst_r[31]}},IF_inst_r[30:25],IF_inst_r[24:21],IF_inst_r[20]};
+        // I:addi, andi, ori, xori, slti, slli,srli,srai
+        7'b0010011: begin
+            ALU_src     = 1;
+            Reg_write   = 1;
+            if(~IF_inst_r[13] & IF_inst_r[12])begin // for shift
+                immediate   = {27'd0,IF_inst_r[24:20]};
+                alu_ctrl    = (IF_inst_r[30])? 4'd8 : {1'b0, IF_inst_r[14:12]};
+            end
+            else begin
+                immediate   = {{21{IF_inst_r[31]}},IF_inst_r[30:25],IF_inst_r[24:21],IF_inst_r[20]};
+                alu_ctrl    = {1'b0, IF_inst_r[14:12]};
+            end
         end
-
-        // I:andi
-        7'b: begin
-            
-            immediate  = {{21{IF_inst_r[31]}},IF_inst_r[30:25],IF_inst_r[24:21],IF_inst_r[20]};
-        end
-
-        // I:ori
-        7'b: begin
-            
-            immediate  = {{21{IF_inst_r[31]}},IF_inst_r[30:25],IF_inst_r[24:21],IF_inst_r[20]};
-        end
-
-        // I:xori
-        7'b: begin
-            
-            immediate  = {{21{IF_inst_r[31]}},IF_inst_r[30:25],IF_inst_r[24:21],IF_inst_r[20]};
-        end  
-
-        // I:slti
-        7'b: begin
-           
-            immediate  = {{21{IF_inst_r[31]}},IF_inst_r[30:25],IF_inst_r[24:21],IF_inst_r[20]};
-        end  
 
         // I:lw
         7'b0000011: begin
@@ -265,6 +244,7 @@ always@(*) begin
             mem_to_reg = 1;
             Reg_write  = 1;
             immediate  = {{21{IF_inst_r[31]}},IF_inst_r[30:25],IF_inst_r[24:21],IF_inst_r[20]};
+            alu_ctrl   = 4'd0;
         end       
 
         // I:jalr
@@ -279,8 +259,8 @@ always@(*) begin
             ALU_src   = 1;
             mem_wen_D = 1;
             immediate = {{21{IF_inst_r[31]}},IF_inst_r[30:25],IF_inst_r[11:8],IF_inst_r[7]};
+            alu_ctrl  = 4'd0;
         end
-
 
         // B:beq , bne
         7'b1100011: begin
@@ -315,24 +295,90 @@ always@(*) begin
 end
 
 //EX
-reg        EX_valid;
-reg [31:0] EX_pc;
-reg [31:0] EX_op1, EX_op2;
-reg [31:0] EX_imm;
-reg [4:0]  EX_rd;
-reg        EX_mem_to_reg, EX_mem_wen, EX_reg_wen, EX_alu_src;
-reg [3:0]  EX_alu_ctrl;
-reg        EX_branch, EX_jal, EX_jalr;
+wire [31:0] rs1_val, rs2_val,EX_op1, EX_op2;
+reg  [31:0] EX_out_w, EX_out_r;
+reg   [4:0] EX_rd_w, EX_rd_r;
+reg         EX_mem_to_reg_w,EX_mem_to_reg_r, EX_mem_wen_D_w, EX_mem_wen_D_r,EX_Reg_write_w, EX_Reg_write_r;
+wire [31:0] alu_result;
+
+// instantiate ALU
+ALU alu_u(
+    .alu_ctrl(ID_alu_ctrl_r),
+    .data1(EX_op1),
+    .data2(EX_op2),
+    .alu_calc(alu_result)
+);
+
+// Forwarding logic
+reg [1:0] forwardA, forwardB;
+always @(*) begin
+    forwardA = 2'b00;
+    forwardB = 2'b00;
+    if (MEM_reg_wen && MEM_rd!=5'd0) begin
+        if (MEM_rd==ID_rs1_addr_r) forwardA = 2'b10;
+        if (MEM_rd==ID_rs2_addr_r) forwardB = 2'b10;
+    end
+    if (WB_reg_wen && WB_rd!=5'd0) begin
+        if (WB_rd==ID_rs1_addr_r && forwardA==2'b00) forwardA=2'b01;
+        if (WB_rd==ID_rs2_addr_r && forwardB==2'b00) forwardB=2'b01;
+    end
+end
+
+assign rs1_val = (forwardA==2'b00) ? ID_rs1_r : 
+                (forwardA==2'b01) ? WB_alu_out : 
+                (forwardA==2'b10) ? MEM_alu_out : 32'd0;
+
+assign rs2_val = (forwardB==2'b00) ? ID_rs2_r :
+                (forwardB==2'b01) ? WB_alu_out : 
+                (forwardB==2'b10) ? MEM_alu_out : 32'd0;
+
+assign EX_op1 = (ID_ALU_src_r) ? ID_imm_r : rs1_val; 
+assign EX_op2 = (ID_ALU_src_r) ? ID_imm_r : rs2_val; 
+
+always@(posedge clk) begin
+    if (!rst_n) begin
+        EX_rd_r <= 5'd0;
+        EX_mem_to_reg_r <= 1'b0;
+        EX_mem_wen_D_r <= 1'b0;
+        EX_Reg_write_r <= 1'b0;
+        EX_out_r <= 32'd0;
+    end 
+    
+    else begin
+        EX_rd_r <= EX_rd_w; // Update rd
+        EX_mem_to_reg_r <= EX_mem_to_reg_w; // Update mem_to_reg flag
+        EX_mem_wen_D_r <= EX_mem_wen_D_w; // Update mem write enable flag
+        EX_Reg_write_r <= EX_Reg_write_w; // Update Reg write flag
+        EX_out_r <= EX_out_w; // Update ALU result
+    end
+
+end
+
+always@(*) begin
+    EX_rd_w = ID_rd_r; // Forward rd from ID stage
+    EX_mem_to_reg_w = ID_mem_to_reg_r; // Forward mem_to_reg flag from ID stage
+    EX_mem_wen_D_w = ID_mem_wen_D_r; // Forward mem write enable flag from ID stage
+    EX_Reg_write_w = ID_Reg_write_r; // Forward Reg write flag from ID stage
+    EX_out_w = alu_result; // ALU result
+
+    if(stall) begin
+        EX_rd_w = EX_rd_r;
+        EX_mem_to_reg_w = EX_mem_to_reg_r;
+        EX_mem_wen_D_w = EX_mem_wen_D_r;
+        EX_Reg_write_w = EX_Reg_write_r;
+        EX_out_w = EX_out_r;
+    end
+end
+
+// Hazard detection
+assign load_use_hazard = ID_valid && EX_mem_to_reg && ((EX_rd==IF_inst_r[19:15]) || (EX_rd==IF_inst_r[24:20]));
+
 
 //MEM
-reg        MEM_valid;
-reg [31:0] MEM_pc;
-reg [31:0] MEM_branch_target;
 reg [31:0] MEM_alu_out;
 reg [31:0] MEM_wdata;
 reg [4:0]  MEM_rd;
 reg        MEM_mem_to_reg, MEM_mem_ren, MEM_mem_wen, MEM_reg_wen;
-reg        MEM_branch, MEM_jal, MEM_jalr;
 
 //WB
 reg        WB_reg_wen;
@@ -345,20 +391,6 @@ reg [4:0]  WB_rd;
 
 // Register file
 reg [31:0] RF_r [0:31];
-
-// ALU wires
-
-// instantiate ALU
-ALU alu_u(
-    .alu_ctrl(EX_alu_ctrl),
-    .data1(EX_op1),
-    .data2(EX_op2),
-    .alu_calc(alu_result)
-);
-
-// Forwarding logic
-
-// Hazard detection
 
 
 // PC output

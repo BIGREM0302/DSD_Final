@@ -1,4 +1,3 @@
-// 5-Stage Pipeline RISC-V CPU with Flush and Hazard Handling and Dual-Cache Stall Support
 // Supports: R/I ALU, LW/SW, BEQ/BNE, JAL, JALR, NOP
 module ALU(
     input  [3:0]        alu_ctrl,    // 0=ADD,1=SUB,2=AND,3=OR,4=XOR,5=SLL,6=SRL,7=SRA,8=SLT
@@ -23,6 +22,7 @@ module ALU(
     end
 
     assign alu_calc = (alu_ctrl == 4'd8)?{{31{1'b0}},temp[31]}:temp;
+    // i think we should not use zero, because zero is in the comparator, and the branch logic is in ID/EX
 
 endmodule
 

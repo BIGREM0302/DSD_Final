@@ -242,10 +242,11 @@ end
 
 always@(*)begin
 
-    ID_rs1_w = RF_r[{IF_inst_r[19:15]}];
-    ID_rs2_w = RF_r[{IF_inst_r[24:20]}];
-    ID_rs1_addr_w = IF_inst_r[19:15];
-    ID_rs2_addr_w = IF_inst_r[24:20];
+    ID_rs1_w = (jal)?  branch_jal_addr:
+               (jalr)? jalr_addr :RF_r[{IF_inst_r[19:15]}];
+    ID_rs2_w = (jal|jalr)?  32'd0 : RF_r[{IF_inst_r[24:20]}];
+    ID_rs1_addr_w = (jal|jalr)? 5'd0:IF_inst_r[19:15];
+    ID_rs2_addr_w = (jal|jalr)? 5'd0:IF_inst_r[24:20];
     ID_rd_w = IF_inst_r[11:7];
 
     //decode

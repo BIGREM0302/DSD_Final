@@ -94,6 +94,7 @@ reg        ID_mem_to_reg_w,ID_mem_to_reg_r, ID_mem_wen_D_w,ID_mem_wen_D_r, ID_Re
 reg [3:0]  ID_alu_ctrl_w,ID_alu_ctrl_r;
 reg        ID_jalr_w,ID_jalr_r;
 reg        ID_lw_w,ID_lw_r;
+reg [31:0] ID_pc_w,ID_pc_r;
 
 // Hazard detection
 wire hazard;
@@ -227,6 +228,7 @@ always@(posedge clk) begin
         ID_alu_ctrl_r <= 4'd7; 
         ID_jalr_r <= 1'b0;
         ID_lw_r <= 1'b0;
+        ID_pc_w <= 32'd0; 
     end 
     
     else begin
@@ -243,13 +245,11 @@ always@(posedge clk) begin
         ID_alu_ctrl_r <= ID_alu_ctrl_w; // Update ALU control signal
         ID_jalr_r <= ID_jalr_w;
         ID_lw_r <= ID_lw_w;
+        ID_pc_r <= ID_pc_w;
     end
-
 end
 
 always@(*)begin
-
-
     ID_rs1_w = (jal)?  IF_pc_r :
                (IF_inst_r[19:15] == MEM_rd_r && MEM_Reg_write_r && MEM_rd_r != 5'd0)? WB_alu_out : RF_r[{IF_inst_r[19:15]}] ;
 
@@ -259,6 +259,7 @@ always@(*)begin
     ID_rs1_addr_w = (jal)? 5'd0:IF_inst_r[19:15];
     ID_rs2_addr_w = (jal)? 5'd0:IF_inst_r[24:20];
     ID_rd_w = IF_inst_r[11:7]; 
+    ID_pc_w = IF_pc_r; // Update PC for ID stage
 
     //decode
     ID_imm_w = immediate;
@@ -284,6 +285,7 @@ always@(*)begin
         ID_alu_ctrl_w = ID_alu_ctrl_r;
         ID_jalr_w = ID_jalr_r;
         ID_lw_w = ID_lw_r;
+        ID_pc_w = ID_pc_r;
     end
 
     else if (ID_jalr_r) begin
@@ -300,13 +302,12 @@ always@(*)begin
         ID_alu_ctrl_w = 4'd7; 
         ID_jalr_w = 1'b0;
         ID_lw_w = 1'b0;
+        ID_pc_w = 32'd0; // Reset PC for jalr
     end
-
 end
 
 //decode
 always@(*) begin      
-
     jal         = 0;
     jalr        = 0;
     branch      = 0;
@@ -451,7 +452,6 @@ always@(posedge clk) begin
         EX_out_r <= EX_out_w; // Update ALU result
         EX_rs2_r <= EX_rs2_w; // Update rs2 value
     end
-
 end
 
 always@(*) begin
@@ -459,7 +459,7 @@ always@(*) begin
     EX_mem_to_reg_w = ID_mem_to_reg_r; // Forward mem_to_reg flag from ID stage
     EX_mem_wen_D_w = ID_mem_wen_D_r; // Forward mem write enable flag from ID stage
     EX_Reg_write_w = ID_Reg_write_r; // Forward Reg write flag from ID stage
-    EX_out_w = alu_result; // ALU result
+    EX_out_w = (ID_jalr_r)? ID_pc_r + 32'd4 : alu_result; // ALU result
     EX_rs2_w = rs2_val; // Forward rs2 value
 
     if(stall) begin
@@ -493,7 +493,6 @@ always@(*) begin
         MEM_mem_to_reg_w = MEM_mem_to_reg_r;
         MEM_Reg_write_w = MEM_Reg_write_r; // Hold values if stalled
     end
-
 end
 
 always@(posedge clk) begin
@@ -512,7 +511,6 @@ always@(posedge clk) begin
         MEM_mem_to_reg_r <= MEM_mem_to_reg_w; // Update mem_to_reg flag
         MEM_Reg_write_r <= MEM_Reg_write_w; // Update Reg write flag
     end
-
 end
 
 ////////////////////////// WB Stage //////////////////////////

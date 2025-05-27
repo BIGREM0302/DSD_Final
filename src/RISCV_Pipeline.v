@@ -57,8 +57,6 @@ module RISCV_Pipeline(
     output [31:0] PC    
 );
 
-// Pipeline registers
-
 wire stall;
 assign stall = ICACHE_stall || DCACHE_stall; // Global stall signal
 
@@ -110,6 +108,12 @@ always@(posedge clk) begin
         IF_inst_r <= {{25{1'b0}},{7'b0010011}};
     end
 
+    else if( cnt_w != 2'd0) begin
+        PC_reg <= PC_reg; // Update PC if not stalled
+        IF_pc_r <= IF_pc_w;
+        IF_inst_r <= {{25{1'b0}},{7'b0010011}};
+    end
+
     else begin
         PC_reg <= PC_w; // Update PC if not stalled
         IF_pc_r <= IF_pc_w;
@@ -136,6 +140,30 @@ reg [4:0]  ID_rs1_addr_w,ID_rs1_addr_r,ID_rs2_addr_w,ID_rs2_addr_r,ID_rd_w,ID_rd
 reg        ID_mem_to_reg_w,ID_mem_to_reg_r, ID_mem_wen_D_w,ID_mem_wen_D_r, ID_Reg_write_w,ID_Reg_write_r, ID_ALU_src_w,ID_ALU_src_r;
 reg [3:0]  ID_alu_ctrl_w,ID_alu_ctrl_r;
 
+// Hazard detection
+wire hazard;
+reg [1:0] cnt_w, cnt_r;
+
+always@(*) begin
+    cnt_w = cnt_r; // Default to hold the counter value
+    if(cnt_r == 2'd3) begin
+        cnt_w = 2'd0; // Reset counter if it reaches 3
+    end
+
+    else if(cnt_r != 2'd0 || hazard) begin
+        cnt_w = cnt_r + 2'd1; // Increment counter if not stalled or hazard detected
+    end
+end
+
+
+always@(posedge clk) begin
+    if (!rst_n) begin
+        cnt_r <= 2'd0; // Reset counter
+    end 
+    else begin
+        cnt_r <= cnt_w; // Reset counter when not stalled
+    end
+end
 
 always@(posedge clk) begin
     if (!rst_n) begin
@@ -297,6 +325,7 @@ end
 //EX
 wire [31:0] rs1_val, rs2_val,EX_op1, EX_op2;
 reg  [31:0] EX_out_w, EX_out_r;
+reg  [31:0] EX_rs2_w, EX_rs2_r;
 reg   [4:0] EX_rd_w, EX_rd_r;
 reg         EX_mem_to_reg_w,EX_mem_to_reg_r, EX_mem_wen_D_w, EX_mem_wen_D_r,EX_Reg_write_w, EX_Reg_write_r;
 wire [31:0] alu_result;
@@ -342,6 +371,7 @@ always@(posedge clk) begin
         EX_mem_wen_D_r <= 1'b0;
         EX_Reg_write_r <= 1'b0;
         EX_out_r <= 32'd0;
+        EX_rs2_r <= 32'd0; // Reset rs2 value
     end 
     
     else begin
@@ -350,6 +380,7 @@ always@(posedge clk) begin
         EX_mem_wen_D_r <= EX_mem_wen_D_w; // Update mem write enable flag
         EX_Reg_write_r <= EX_Reg_write_w; // Update Reg write flag
         EX_out_r <= EX_out_w; // Update ALU result
+        EX_rs2_r <= EX_rs2_w; // Update rs2 value
     end
 
 end
@@ -360,6 +391,7 @@ always@(*) begin
     EX_mem_wen_D_w = ID_mem_wen_D_r; // Forward mem write enable flag from ID stage
     EX_Reg_write_w = ID_Reg_write_r; // Forward Reg write flag from ID stage
     EX_out_w = alu_result; // ALU result
+    EX_rs2_w = rs2_val; // Forward rs2 value
 
     if(stall) begin
         EX_rd_w = EX_rd_r;
@@ -367,59 +399,76 @@ always@(*) begin
         EX_mem_wen_D_w = EX_mem_wen_D_r;
         EX_Reg_write_w = EX_Reg_write_r;
         EX_out_w = EX_out_r;
+        EX_rs2_w = EX_rs2_r; // Hold rs2 value if stalled
     end
 end
 
-// Hazard detection
-assign load_use_hazard = ID_valid && EX_mem_to_reg && ((EX_rd==IF_inst_r[19:15]) || (EX_rd==IF_inst_r[24:20]));
-
-
 //MEM
-reg [31:0] MEM_alu_out;
-reg [31:0] MEM_wdata;
-reg [4:0]  MEM_rd;
-reg        MEM_mem_to_reg, MEM_mem_ren, MEM_mem_wen, MEM_reg_wen;
+wire [31:0] MEM_alu_out;
+assign MEM_alu_out = EX_out_r;
+
+wire [31:0] MEM_wdata;
+assign MEM_wdata = EX_rs2_r; // Data to write to memory
+
+reg [31:0] MEM_rdata_w, MEM_rdata_r;
+reg [4:0]  MEM_rd_w, MEM_rd_r;
+reg        MEM_mem_to_reg_w, MEM_mem_to_reg_r,MEM_Reg_write_w, MEM_Reg_write_r;
+
+assign DCACHE_ren = !EX_mem_wen_D_r; // Read enable for D-cache
+assign DCACHE_wen = EX_mem_wen_D_r; // Write enable for D-cache
+assign DCACHE_addr = MEM_alu_out[31:2]; // Address for D-cache
+assign DCACHE_wdata = {MEM_wdata[7:0],MEM_wdata[15:8],MEM_wdata[23:16],MEM_wdata[31:24]}; // Data to write to D-cache
+
+always@(*) begin
+    MEM_rdata_w = {DCACHE_rdata[7:0],DCACHE_rdata[15:8],DCACHE_rdata[23:16],DCACHE_rdata[31:24]}; // Data read from D-cache
+    MEM_rd = EX_rd_r; // Forward rd from EX stage
+    MEM_mem_to_reg_w = EX_mem_to_reg_r; // Forward mem_to_reg flag from EX stage
+    MEM_Reg_write_w = EX_Reg_write_r; // Forward Reg write flag from EX stage
+
+    if(stall) begin
+        MEM_rdata_w = MEM_rdata_r;
+        MEM_rd_w = MEM_rd_r;
+        MEM_mem_to_reg_w = MEM_mem_to_reg_r;
+        MEM_Reg_write_w = MEM_Reg_write_r; // Hold values if stalled
+    end
+
+end
+
+always@(posedge clk) begin
+    if (!rst_n) begin
+        MEM_rdata_r <= 32'd0; // Reset memory read data
+        MEM_rd_r <= 5'd0; // Reset rd
+        MEM_mem_to_reg_r <= 1'b0; // Reset mem_to_reg flag
+        MEM_Reg_write_r <= 1'b0; // Reset Reg write flag
+    end 
+    
+    else begin
+        MEM_rdata_r <= MEM_rdata_w; // Update memory read data
+        MEM_rd_r <= MEM_rd_w; // Update rd
+        MEM_mem_to_reg_r <= MEM_mem_to_reg_w; // Update mem_to_reg flag
+        MEM_Reg_write_r <= MEM_Reg_write_w; // Update Reg write flag
+    end
+
+end
 
 //WB
-reg        WB_reg_wen;
-reg        WB_mem_to_reg;
-reg [31:0] WB_alu_out;
-reg [31:0] WB_mem_rdata;
-reg [4:0]  WB_rd;
-
-
+wire [31:0] WB_alu_out;
+assign WB_alu_out = (MEM_mem_to_reg_r)? MEM_rdata_r : MEM_alu_out; // Choose between memory read data and ALU output
 
 // Register file
-reg [31:0] RF_r [0:31];
+reg [31:0] RF_r [0:31]; 
 
-
-// PC output
-
-
-// PC update
-
-
-// IF stage
-
-
-// I-cache interface
-
-// ID stage (decode)
-
-
-// ID/EX pipeline register
-
-
-// compute branch target
-
-
-// EX/MEM pipeline register
-
-
-// D-cache interface
-
-
-// MEM/WB pipeline register and write-back
-
+always@(posedge clk) begin
+    if (!rst_n) begin
+        // Reset register file to zero
+        integer i;
+        for (i = 0; i < 32; i = i + 1) begin
+            RF_r[i] <= 32'd0;
+        end
+    end 
+    else if (MEM_Reg_write_r && MEM_rd_r != 5'd0) begin
+        RF_r[MEM_rd_r] <= WB_alu_out; 
+    end
+end
 
 endmodule

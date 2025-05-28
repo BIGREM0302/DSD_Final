@@ -40,19 +40,11 @@ module I_cache(
     
     always@(*) begin
         mem_rdata_proc_w = mem_rdata;
-        cnt_w = 1'b0;
-        if( proc_stall & mem_ready ) begin
-            cnt_w = 1'b1;
-        end
+        cnt_w = mem_ready;
     end
 
     always@(posedge clk)begin
-        if (proc_reset) begin
-            cnt_r <= 1'b0;
-        end
-        else begin
-            cnt_r <= cnt_w;
-        end
+        cnt_r <= mem_ready;
         mem_rdata_proc_r <= mem_rdata_proc_w;
     end
 
@@ -73,7 +65,7 @@ module I_cache(
     assign index = proc_addr[1:0];
     assign block_num = proc_addr[4:2];
     assign tag = proc_addr[29:5];
-    assign proc_stall = (~hit) || (cnt_r) ;
+    assign proc_stall = (~hit);
 //FSM
 always@(*) begin
     case(state_r) // synopsys parallel_case full_case

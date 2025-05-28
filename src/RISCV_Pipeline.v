@@ -138,10 +138,10 @@ reg [31:0] RF_r [0:31];
 
 ////////////////////////// IF Stage //////////////////////////
 always @(*) begin
-    PC_w = $signed(PC_reg) + $signed(32'd4); // Increment PC by 4 for next instruction
-    IF_valid_w = 1'b1; // Set IF stage valid flag
-    IF_pc_w = PC_reg; // Update IF stage PC
-    IF_inst_w = {ICACHE_rdata[7:0], ICACHE_rdata[15:8], ICACHE_rdata[23:16], ICACHE_rdata[31:24]}; // Read instruction from I-cache
+    PC_w       = $signed(PC_reg) + $signed(32'd4); // Increment PC by 4 for next instruction
+    IF_valid_w = 1'b1;   // Set IF stage valid flag
+    IF_pc_w    = PC_reg; // Update IF stage PC
+    IF_inst_w  = {ICACHE_rdata[7:0], ICACHE_rdata[15:8], ICACHE_rdata[23:16], ICACHE_rdata[31:24]}; // Read instruction from I-cache
 
     if (stall) begin
         PC_w      = PC_reg;    // Hold PC if stalled
@@ -149,7 +149,7 @@ always @(*) begin
         IF_inst_w = IF_inst_r; // Hold instruction if stalled
     end
 
-    else if ((bne & ~zero) | (branch & zero)| jal) begin
+    else if ((bne & ~zero) | (branch & zero) | jal) begin
         PC_w       = branch_jal_addr;
         IF_valid_w = 1'b0;
     end
@@ -164,7 +164,7 @@ always @(posedge clk) begin
     if (!rst_n) begin
         PC_reg    <= 32'd0; // Reset PC to 0
         IF_pc_r   <= 32'd0;
-        IF_inst_r <= {{25{1'b0}}, {7'b0010011}};  // 25 0's + 0010011 -> NOP
+        IF_inst_r <= {{25{1'b0}}, {7'b0010011}}; // 25 0's + 0010011 -> NOP
     end
 
     else if (!IF_valid_w) begin
@@ -247,7 +247,7 @@ always @(posedge clk) begin
     end
 end
 
-always @(*)begin
+always @(*) begin
     ID_rs1_w  = (jal) ? IF_pc_r :
                 (IF_inst_r[19:15] == MEM_rd_r && MEM_Reg_write_r && MEM_rd_r != 5'd0) ? WB_alu_out : RF_r[{IF_inst_r[19:15]}];
 
@@ -264,8 +264,8 @@ always @(*)begin
 
     ID_rs1_addr_w = (jal) ? 5'd0 : IF_inst_r[19:15];
     ID_rs2_addr_w = (jal) ? 5'd0 : IF_inst_r[24:20];
-    ID_rd_w = IF_inst_r[11:7];
-    ID_pc_w = IF_pc_r; // Update PC for ID stage
+    ID_rd_w       = IF_inst_r[11:7];
+    ID_pc_w       = IF_pc_r; // Update PC for ID stage
 
     // Decode
     ID_imm_w        = immediate;
@@ -278,37 +278,37 @@ always @(*)begin
     ID_lw_w         = lw;
 
     if (stall) begin
-        ID_rs1_w = ID_rs1_r;
-        ID_rs2_w = ID_rs2_r;
-        ID_rs1_addr_w = ID_rs1_addr_r;
-        ID_rs2_addr_w = ID_rs2_addr_r;
-        ID_rd_w = ID_rd_r;
-        ID_imm_w = ID_imm_r;
+        ID_rs1_w        = ID_rs1_r;
+        ID_rs2_w        = ID_rs2_r;
+        ID_rs1_addr_w   = ID_rs1_addr_r;
+        ID_rs2_addr_w   = ID_rs2_addr_r;
+        ID_rd_w         = ID_rd_r;
+        ID_imm_w        = ID_imm_r;
         ID_mem_to_reg_w = ID_mem_to_reg_r;
-        ID_mem_wen_D_w = ID_mem_wen_D_r;
-        ID_Reg_write_w = ID_Reg_write_r;
-        ID_ALU_src_w = ID_ALU_src_r;
-        ID_alu_ctrl_w = ID_alu_ctrl_r;
-        ID_jalr_w = ID_jalr_r;
-        ID_lw_w = ID_lw_r;
-        ID_pc_w = ID_pc_r;
+        ID_mem_wen_D_w  = ID_mem_wen_D_r;
+        ID_Reg_write_w  = ID_Reg_write_r;
+        ID_ALU_src_w    = ID_ALU_src_r;
+        ID_alu_ctrl_w   = ID_alu_ctrl_r;
+        ID_jalr_w       = ID_jalr_r;
+        ID_lw_w         = ID_lw_r;
+        ID_pc_w         = ID_pc_r;
     end
 
     else if (ID_jalr_r) begin
-        ID_rs1_w = 32'd0;
-        ID_rs2_w = 32'd0;
-        ID_rs1_addr_w = 5'd0; // Reset rs1 address
-        ID_rs2_addr_w = 5'd0; // Reset rs2 address
-        ID_rd_w = 5'd0;
-        ID_imm_w = 32'd0;
+        ID_rs1_w        = 32'd0;
+        ID_rs2_w        = 32'd0;
+        ID_rs1_addr_w   = 5'd0; // Reset rs1 address
+        ID_rs2_addr_w   = 5'd0; // Reset rs2 address
+        ID_rd_w         = 5'd0;
+        ID_imm_w        = 32'd0;
         ID_mem_to_reg_w = 1'b0;
-        ID_mem_wen_D_w = 1'b0;
-        ID_Reg_write_w = 1'b0;
-        ID_ALU_src_w = 1'b0;
-        ID_alu_ctrl_w = 4'd7;
-        ID_jalr_w = 1'b0;
-        ID_lw_w = 1'b0;
-        ID_pc_w = 32'd0; // Reset PC for jalr
+        ID_mem_wen_D_w  = 1'b0;
+        ID_Reg_write_w  = 1'b0;
+        ID_ALU_src_w    = 1'b0;
+        ID_alu_ctrl_w   = 4'd7;
+        ID_jalr_w       = 1'b0;
+        ID_lw_w         = 1'b0;
+        ID_pc_w         = 32'd0; // Reset PC for jalr
     end
 end
 
@@ -326,7 +326,6 @@ always @(*) begin
     alu_ctrl    = 4'd7;
     lw          = 0;
 
-
     case (IF_inst_r[6:0])  // R:add, sub, and, or, xor, slli, srai, srli, slt  I:addi, andi, ori, xori, slti, lw, jalr  S:sw  B:beq, bne  J:jal
 
         // R:add, sub, and, or, xor, slt
@@ -343,6 +342,7 @@ always @(*) begin
                 immediate = {27'd0, IF_inst_r[24:20]};
                 alu_ctrl  = (IF_inst_r[30]) ? 4'd8 : {1'b0, IF_inst_r[14:12]};
             end
+
             else begin
                 immediate = {{21{IF_inst_r[31]}}, IF_inst_r[30:25], IF_inst_r[24:21], IF_inst_r[20]};
                 alu_ctrl  = {1'b0, IF_inst_r[14:12]};
@@ -405,7 +405,7 @@ always @(*) begin
 end
 
 ////////////////////////// EX Stage //////////////////////////
-// instantiate ALU
+// Instantiate ALU
 ALU alu_u(
     .alu_ctrl(ID_alu_ctrl_r),
     .data1(EX_op1),
@@ -416,13 +416,14 @@ ALU alu_u(
 always @(*) begin
     forwardA = 2'b00;
     forwardB = 2'b00;
-    if (EX_Reg_write_r && EX_rd_r!=5'd0) begin
-        if (EX_rd_r==ID_rs1_addr_r) forwardA = 2'b10;
-        if (EX_rd_r==ID_rs2_addr_r) forwardB = 2'b10;
+    if (EX_Reg_write_r && EX_rd_r != 5'd0) begin
+        if (EX_rd_r == ID_rs1_addr_r) forwardA = 2'b10;
+        if (EX_rd_r == ID_rs2_addr_r) forwardB = 2'b10;
     end
-    if (MEM_Reg_write_r && MEM_rd_r!=5'd0) begin
-        if (MEM_rd_r==ID_rs1_addr_r && forwardA==2'b00) forwardA=2'b01;
-        if (MEM_rd_r==ID_rs2_addr_r && forwardB==2'b00) forwardB=2'b01;
+
+    if (MEM_Reg_write_r && MEM_rd_r != 5'd0) begin
+        if (MEM_rd_r==ID_rs1_addr_r && forwardA == 2'b00) forwardA = 2'b01;
+        if (MEM_rd_r==ID_rs2_addr_r && forwardB == 2'b00) forwardB = 2'b01;
     end
 end
 
@@ -466,12 +467,12 @@ always @(*) begin
     EX_rs2_w        = rs2_val;         // Forward rs2 value
 
     if (stall) begin
-        EX_rd_w = EX_rd_r;
+        EX_rd_w         = EX_rd_r;
         EX_mem_to_reg_w = EX_mem_to_reg_r;
-        EX_mem_wen_D_w = EX_mem_wen_D_r;
-        EX_Reg_write_w = EX_Reg_write_r;
-        EX_out_w = EX_out_r;
-        EX_rs2_w = EX_rs2_r; // Hold rs2 value if stalled
+        EX_mem_wen_D_w  = EX_mem_wen_D_r;
+        EX_Reg_write_w  = EX_Reg_write_r;
+        EX_out_w        = EX_out_r;
+        EX_rs2_w        = EX_rs2_r; // Hold rs2 value if stalled
     end
 end
 
@@ -524,6 +525,7 @@ always @(posedge clk) begin
             RF_r[i] <= 32'd0;
         end
     end
+
     else if (MEM_Reg_write_r && MEM_rd_r != 5'd0) begin
         RF_r[MEM_rd_r] <= WB_alu_out;
     end

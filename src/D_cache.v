@@ -1,217 +1,166 @@
 module D_cache(
-    input           clk,
-    input           proc_reset,
-    // processor interface
-    input           proc_read,
-    input           proc_write,
-    input   [29:0]  proc_addr,
-    output reg [31:0] proc_rdata,
-    input   [31:0]  proc_wdata,
-    output reg      proc_stall,
-    // memory interface
-    output reg      mem_read,
-    output reg      mem_write,
-    output reg [27:0] mem_addr,
-    output reg [127:0] mem_wdata,
-    input   [127:0] mem_rdata,
-    input           mem_ready
+    clk,
+    proc_reset,
+    proc_read,
+    proc_write,
+    proc_addr,
+    proc_rdata,
+    proc_wdata,
+    proc_stall,
+    mem_read,
+    mem_write,
+    mem_addr,
+    mem_rdata,
+    mem_wdata,
+    mem_ready
 );
+    
+//==== input/output definition ============================
+    input          clk;
+    // processor interface
+    input          proc_reset;
+    input          proc_read, proc_write;
+    input   [29:0] proc_addr;
+    input   [31:0] proc_wdata;
+    output    proc_stall;
+    output reg [31:0] proc_rdata;
+    // memory interface
+    input  [127:0] mem_rdata;
+    input          mem_ready;
+    output reg    mem_read, mem_write;
+    output reg [27:0] mem_addr;
+    output reg [127:0] mem_wdata;
 
-  localparam S_IDLE      = 2'b00;
-  localparam S_WRITEBACK = 2'b01;
-  localparam S_READMISS  = 2'b10;
+    localparam COMP = 0, ALLC = 1, WB = 2;
+    integer i;
+//==== wire/reg definition ================================
+    //reg [154:0] cache0, cache1, cache2, cache3, cache4, cache5, cache6, cache7; //8 blocks each with 4 words
+    reg [154:0] cache [0:7]; //8 blocks each with 4 words
+    //reg [154:0] cache0_w, cache1_w, cache2_w, cache3_w, cache4_w, cache5_w, cache6_w, cache7_w;
+    reg [154:0] cache_w [0:7];
+    reg [1:0] state_r, state_w;
+    reg hit;
+    reg dirty;
+    wire [1:0] index;
+    wire [2:0] block_num;
+    wire [24:0] tag;
 
-  reg [1:0]  state_r, state_w;
-  reg        victim_r, victim_w;
-
-  reg [31:0] latched_data_r, latched_data_w;
-  reg        use_latched_r,  use_latched_w;
-
-  reg [127:0] cache_r0 [0:3], cache_w0 [0:3];
-  reg [127:0] cache_r1 [0:3], cache_w1 [0:3];
-  reg         valid_r0 [0:3],  valid_w0 [0:3];
-  reg         valid_r1 [0:3],  valid_w1 [0:3];
-  reg         dirty_r0 [0:3],  dirty_w0 [0:3];
-  reg         dirty_r1 [0:3],  dirty_w1 [0:3];
-  reg  [25:0] tag_r0   [0:3],  tag_w0   [0:3];
-  reg  [25:0] tag_r1   [0:3],  tag_w1   [0:3];
-  reg         lru_r    [0:3],  lru_w    [0:3];
-
-  wire [1:0]  set_idx    = proc_addr[3:2];
-  wire [25:0] addr_tag   = proc_addr[29:4];
-  wire [27:0] block_addr = proc_addr[29:2];
-  wire [1:0]  offset     = proc_addr[1:0];
-
-  wire hit0 = valid_r0[set_idx] && (tag_r0[set_idx] == addr_tag);
-  wire hit1 = valid_r1[set_idx] && (tag_r1[set_idx] == addr_tag);
-
-  integer i, j;
-
-  //==========================================================================
-  // combinational logic
-  //==========================================================================
-  always @(*) begin
-    state_w         = state_r;
-    victim_w        = victim_r;
-    latched_data_w  = latched_data_r;
-    use_latched_w   = 1'b0;
-
-    proc_stall      = 1'b0;
-    proc_rdata      = 32'b0;
-    mem_read        = 1'b0;
-    mem_write       = 1'b0;
-    mem_addr        = block_addr;
-    mem_wdata       = 128'b0;
-
-    for (j = 0; j < 4; j = j + 1) begin
-      cache_w0[j] = cache_r0[j];
-      cache_w1[j] = cache_r1[j];
-      valid_w0[j] = valid_r0[j];
-      valid_w1[j] = valid_r1[j];
-      dirty_w0[j] = dirty_r0[j];
-      dirty_w1[j] = dirty_r1[j];
-      tag_w0[j]   = tag_r0[j];
-      tag_w1[j]   = tag_r1[j];
-      lru_w[j]    = lru_r[j];
+//==== combinational circuit ==============================
+    assign index = proc_addr[1:0];
+    assign block_num = proc_addr[4:2];
+    assign tag = proc_addr[29:5];
+    assign proc_stall = ~hit;
+//FSM
+always@(*) begin
+    case(state_r) // synopsys parallel_case full_case
+    COMP: begin
+        if(~proc_write & ~proc_read) state_w = COMP;
+        else if(hit) state_w = COMP;
+        else if(dirty) state_w = WB;
+        else state_w = ALLC;
     end
-
-    case (state_r)
-      S_IDLE: begin
-        if (proc_read && hit0) begin
-          proc_rdata        = cache_r0[set_idx][offset*32 +:32];
-          lru_w[set_idx]    = 1'b1;  
-        end
-        else if (proc_read && hit1) begin
-          proc_rdata        = cache_r1[set_idx][offset*32 +:32];
-          lru_w[set_idx]    = 1'b0;  
-        end
-
-        else if (proc_write && hit0) begin
-          cache_w0[set_idx][offset*32 +:32] = proc_wdata;
-          dirty_w0[set_idx]    = 1'b1;
-          lru_w[set_idx]       = 1'b1;
-        end
-        else if (proc_write && hit1) begin
-          cache_w1[set_idx][offset*32 +:32] = proc_wdata;
-          dirty_w1[set_idx]    = 1'b1;
-          lru_w[set_idx]       = 1'b0;
-        end
-
-        else if (proc_read || proc_write) begin
-          proc_stall = 1'b1;
-          if (!valid_r0[set_idx])        victim_w = 1'b0;
-          else if (!valid_r1[set_idx])   victim_w = 1'b1;
-          else                            victim_w = lru_r[set_idx];
-          if ((victim_w==0 && dirty_r0[set_idx]) ||
-              (victim_w==1 && dirty_r1[set_idx])) begin
-            state_w   = S_WRITEBACK;
-            mem_write = 1'b1;
-            if (victim_w==0) begin
-              mem_wdata = cache_r0[set_idx];
-              mem_addr  = { tag_r0[set_idx], set_idx };
-            end else begin
-              mem_wdata = cache_r1[set_idx];
-              mem_addr  = { tag_r1[set_idx], set_idx };
-            end
-          end
-          else begin
-            state_w   = S_READMISS;
-            mem_read  = 1'b1;
-            mem_addr  = block_addr;
-          end
-        end
-      end
-
-      S_WRITEBACK: begin
-        proc_stall = 1'b1;
-        mem_write  = 1'b1;
-        if (victim_r==0) begin
-          mem_wdata = cache_r0[set_idx];
-          mem_addr  = { tag_r0[set_idx], set_idx };
-        end else begin
-          mem_wdata = cache_r1[set_idx];
-          mem_addr  = { tag_r1[set_idx], set_idx };
-        end
-        if (mem_ready) begin
-          state_w  = S_READMISS;
-          mem_read = 1'b1;
-          mem_addr = block_addr;
-        end
-      end
-
-      S_READMISS: begin
-        proc_stall = 1'b1;
-        mem_read   = 1'b1;
-        mem_addr   = block_addr;
-        if (mem_ready) begin
-          if (victim_r==0) begin
-            cache_w0[set_idx] = mem_rdata;
-            valid_w0[set_idx] = 1'b1;
-            dirty_w0[set_idx] = 1'b0;
-            tag_w0[set_idx]   = addr_tag;
-            if (proc_write) begin
-              cache_w0[set_idx][offset*32 +:32] = proc_wdata;
-              dirty_w0[set_idx] = 1'b1;
-            end
-            lru_w[set_idx]    = 1'b1;
-          end else begin
-            cache_w1[set_idx] = mem_rdata;
-            valid_w1[set_idx] = 1'b1;
-            dirty_w1[set_idx] = 1'b0;
-            tag_w1[set_idx]   = addr_tag;
-            if (proc_write) begin
-              cache_w1[set_idx][offset*32 +:32] = proc_wdata;
-              dirty_w1[set_idx] = 1'b1;
-            end
-            lru_w[set_idx]    = 1'b0;
-          end
-          latched_data_w = mem_rdata[offset*32 +:32];
-          use_latched_w  = 1'b1;
-          state_w        = S_IDLE;
-        end
-      end
-
-      default: state_w = S_IDLE;
+    ALLC: begin
+        if(mem_ready) state_w = COMP;
+        else state_w = ALLC;
+    end
+    WB: begin
+        if(mem_ready) state_w = ALLC;
+        else state_w = WB;
+    end
     endcase
+end
 
-    if (state_r==S_IDLE && use_latched_r) begin
-      proc_rdata = latched_data_r;
+//functions
+function [31:0] cur_data;
+    input [154:0] cur_block;
+    input [1:0] cur_index;
+    begin
+        cur_data = (cur_index == 2'd0)? cur_block[31:0]:
+                   (cur_index == 2'd1)? cur_block[63:32]:
+                   (cur_index == 2'd2)? cur_block[95:64]:
+                    cur_block[127:96];
     end
-  end
+endfunction
 
-  //==========================================================================
-  // sequential logic
-  //==========================================================================
-  always @(posedge clk or posedge proc_reset) begin
-    if (proc_reset) begin
-      state_r        <= S_IDLE;
-      victim_r       <= 1'b0;
-      latched_data_r <= 32'b0;
-      use_latched_r  <= 1'b0;
-      for (i = 0; i < 4; i = i + 1) begin
-        valid_r0[i]  <= 1'b0; valid_r1[i]  <= 1'b0;
-        dirty_r0[i]  <= 1'b0; dirty_r1[i]  <= 1'b0;
-        tag_r0[i]    <= 26'b0; tag_r1[i]    <= 26'b0;
-        cache_r0[i]  <= 128'b0; cache_r1[i]  <= 128'b0;
-        lru_r[i]     <= 1'b0;
-      end
-    end else begin
-      state_r        <= state_w;
-      victim_r       <= victim_w;
-      latched_data_r <= latched_data_w;
-      use_latched_r  <= use_latched_w;
-      for (i = 0; i < 4; i = i + 1) begin
-        cache_r0[i] <= cache_w0[i];
-        cache_r1[i] <= cache_w1[i];
-        valid_r0[i] <= valid_w0[i];
-        valid_r1[i] <= valid_w1[i];
-        dirty_r0[i] <= dirty_w0[i];
-        dirty_r1[i] <= dirty_w1[i];
-        tag_r0[i]   <= tag_w0[i];
-        tag_r1[i]   <= tag_w1[i];
-        lru_r[i]    <= lru_w[i];
-      end
+function hit_check;
+    input [154:0] cur_block;
+    input [24:0] cur_tag;
+    begin
+        hit_check = (cur_block[154] & (cur_tag == cur_block[152:128]));
     end
-  end
+endfunction
+
+//control output logic
+always@(*) begin
+    mem_read = 0;
+    mem_write = 0;
+    //proc_stall = (~hit)? 1'b1:1'b0;
+    case(state_r)
+    ALLC:begin
+        if(~mem_ready) mem_read = 1;
+    end
+    WB:begin
+        //miss and dirty, need update memory's value
+        if(~mem_ready) mem_write = 1;
+    end
+    endcase
+end
+
+//data output logic
+always@(*) begin
+    for(i = 0; i < 8; i = i + 1)
+        cache_w[i] = cache[i];
+    mem_addr = proc_addr[29:2];
+    proc_rdata = cur_data(cache[block_num], index);
+    mem_wdata = cache[block_num][127:0];
+    hit = hit_check(cache[block_num], tag);
+    dirty = cache[block_num][153];
+    if(state_r == WB) mem_addr = {cache[block_num][152:128], block_num};
+    if(state_r == ALLC && mem_ready) cache_w[block_num] = {1'b1, 1'b0, tag, mem_rdata};
+    if(proc_write && hit)begin
+        case(index)
+        2'd0:begin
+                //if(state_r == ALLC && mem_ready)
+                //cache_w[block_num] = {1'b1, 1'b1, tag, mem_rdata[127:32], proc_wdata};
+                //else if(hit) 
+                cache_w[block_num] = {1'b1, 1'b1, tag, cache[block_num][127:32], proc_wdata};
+        end
+        2'd1:begin
+                //if(state_r == ALLC && mem_ready)
+                //cache_w[block_num] = {1'b1, 1'b1, tag, mem_rdata[127:64], proc_wdata, mem_rdata[31:0]};
+                //else if(hit) 
+                cache_w[block_num] = {1'b1, 1'b1, tag, cache[block_num][127:64], proc_wdata, cache[block_num][31:0]};
+        end
+        2'd2:begin
+                //if(state_r == ALLC && mem_ready)
+                //cache_w[block_num] = {1'b1, 1'b1, tag, mem_rdata[127:96], proc_wdata, mem_rdata[63:0]};
+                //else if(hit) 
+                cache_w[block_num] = {1'b1, 1'b1, tag, cache[block_num][127:96], proc_wdata, cache[block_num][63:0]};
+        end
+        2'd3:begin
+                //if(state_r == ALLC && mem_ready)
+                //cache_w[block_num] = {1'b1, 1'b1, tag, proc_wdata, mem_rdata[95:0]};
+                //else if(hit) 
+                cache_w[block_num] = {1'b1, 1'b1, tag, proc_wdata, cache[block_num][95:0]};
+        end
+        endcase
+    end
+end
+
+//==== sequential circuit =================================
+always@( posedge clk ) begin
+    if( proc_reset ) begin
+        state_r <= COMP;
+        for(i = 0; i < 8; i = i + 1)begin
+            cache[i] <= 0;
+        end
+    end
+    else begin
+        state_r <= state_w;
+        for(i = 0; i < 8; i = i + 1)begin
+            cache[i] <= cache_w[i];
+        end
+    end
+end
 
 endmodule

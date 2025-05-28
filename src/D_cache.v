@@ -33,6 +33,30 @@ module D_cache(
 
     localparam COMP = 0, ALLC = 1, WB = 2;
     integer i;
+
+    // protect
+    reg [127:0] mem_rdata_proc_w, mem_rdata_proc_r;
+    reg cnt_w,cnt_r;
+    
+    always@(*) begin
+        mem_rdata_proc_w = mem_rdata;
+        cnt_w = 1'b0;
+        if( proc_stall & mem_ready ) begin
+            cnt_w = 1'b1;
+        end
+    end
+
+    always@(posedge clk)begin
+        if (proc_reset) begin
+            cnt_r <= 1'b0;
+        end
+        else begin
+            cnt_r <= cnt_w;
+        end
+        mem_rdata_proc_r <= mem_rdata_proc_w;
+    end
+
+
 //==== wire/reg definition ================================
     //reg [154:0] cache0, cache1, cache2, cache3, cache4, cache5, cache6, cache7; //8 blocks each with 4 words
     reg [154:0] cache [0:7]; //8 blocks each with 4 words
@@ -49,7 +73,7 @@ module D_cache(
     assign index = proc_addr[1:0];
     assign block_num = proc_addr[4:2];
     assign tag = proc_addr[29:5];
-    assign proc_stall = ~hit;
+    assign proc_stall = (~hit) || (cnt_r) ;
 //FSM
 always@(*) begin
     case(state_r) // synopsys parallel_case full_case
@@ -60,11 +84,11 @@ always@(*) begin
         else state_w = ALLC;
     end
     ALLC: begin
-        if(mem_ready) state_w = COMP;
+        if(cnt_r) state_w = COMP;
         else state_w = ALLC;
     end
     WB: begin
-        if(mem_ready) state_w = ALLC;
+        if(cnt_r) state_w = ALLC;
         else state_w = WB;
     end
     endcase
@@ -97,11 +121,11 @@ always@(*) begin
     //proc_stall = (~hit)? 1'b1:1'b0;
     case(state_r)
     ALLC:begin
-        if(~mem_ready) mem_read = 1;
+        if(~cnt_r) mem_read = 1;
     end
     WB:begin
         //miss and dirty, need update memory's value
-        if(~mem_ready) mem_write = 1;
+        if(~cnt_r) mem_write = 1;
     end
     endcase
 end
@@ -116,7 +140,7 @@ always@(*) begin
     hit = hit_check(cache[block_num], tag);
     dirty = cache[block_num][153];
     if(state_r == WB) mem_addr = {cache[block_num][152:128], block_num};
-    if(state_r == ALLC && mem_ready) cache_w[block_num] = {1'b1, 1'b0, tag, mem_rdata};
+    if(state_r == ALLC && cnt_r) cache_w[block_num] = {1'b1, 1'b0, tag, mem_rdata_proc_r};
     if(proc_write && hit)begin
         case(index)
         2'd0:begin

@@ -173,7 +173,7 @@ always @(posedge clk) begin
         IF_inst_r <= {{25{1'b0}}, {7'b0010011}};
     end
 
-    else if(cnt_w) begin
+    else if (cnt_w) begin
         PC_reg    <= PC_reg; // Update PC if not stalled
         IF_pc_r   <= IF_pc_r;
         IF_inst_r <= IF_inst_r;
@@ -195,7 +195,7 @@ always @(*) begin
         cnt_w = 1'b0; // Reset counter if it reaches 1
     end
 
-    else if(hazard) begin
+    else if (hazard) begin
         cnt_w = 1'b1; // Increment counter if not stalled or hazard detected
     end
 end
@@ -251,11 +251,11 @@ always @(*) begin
     ID_rs1_w  = (jal) ? IF_pc_r :
                 (IF_inst_r[19:15] == MEM_rd_r && MEM_Reg_write_r && MEM_rd_r != 5'd0) ? WB_alu_out : RF_r[{IF_inst_r[19:15]}];
 
-    ID_rs2_w  = (jal) ?  32'd4 :
+    ID_rs2_w  = (jal) ? 32'd4 :
                 (IF_inst_r[24:20] == MEM_rd_r && MEM_Reg_write_r && MEM_rd_r != 5'd0) ? WB_alu_out : RF_r[{IF_inst_r[24:20]}];
 
     ID_rs1_br = (IF_inst_r[19:15] == ID_rd_r && ID_Reg_write_r && ID_rd_r != 5'd0) ? EX_out_w :
-                (IF_inst_r[19:15] == EX_rd_r && EX_Reg_write_r && EX_rd_r != 5'd0) ? MEM_alu_out:
+                (IF_inst_r[19:15] == EX_rd_r && EX_Reg_write_r && EX_rd_r != 5'd0) ? MEM_alu_out :
                 (IF_inst_r[19:15] == MEM_rd_r && MEM_Reg_write_r && MEM_rd_r != 5'd0) ? WB_alu_out : RF_r[{IF_inst_r[19:15]}];
 
     ID_rs2_br = (IF_inst_r[24:20] == ID_rd_r && ID_Reg_write_r && ID_rd_r != 5'd0) ? EX_out_w :
@@ -422,18 +422,18 @@ always @(*) begin
     end
 
     if (MEM_Reg_write_r && MEM_rd_r != 5'd0) begin
-        if (MEM_rd_r==ID_rs1_addr_r && forwardA == 2'b00) forwardA = 2'b01;
-        if (MEM_rd_r==ID_rs2_addr_r && forwardB == 2'b00) forwardB = 2'b01;
+        if (MEM_rd_r == ID_rs1_addr_r && forwardA == 2'b00) forwardA = 2'b01;
+        if (MEM_rd_r == ID_rs2_addr_r && forwardB == 2'b00) forwardB = 2'b01;
     end
 end
 
-assign rs1_val = (forwardA==2'b00) ? ID_rs1_r :
-                 (forwardA==2'b01) ? WB_alu_out :
-                 (forwardA==2'b10) ? MEM_alu_out : 32'd0;
+assign rs1_val = (forwardA == 2'b00) ? ID_rs1_r :
+                 (forwardA == 2'b01) ? WB_alu_out :
+                 (forwardA == 2'b10) ? MEM_alu_out : 32'd0;
 
-assign rs2_val = (forwardB==2'b00) ? ID_rs2_r :
-                 (forwardB==2'b01) ? WB_alu_out :
-                 (forwardB==2'b10) ? MEM_alu_out : 32'd0;
+assign rs2_val = (forwardB == 2'b00) ? ID_rs2_r :
+                 (forwardB == 2'b01) ? WB_alu_out :
+                 (forwardB == 2'b10) ? MEM_alu_out : 32'd0;
 
 assign EX_op1 = rs1_val;
 assign EX_op2 = (ID_ALU_src_r) ? ID_imm_r : rs2_val;

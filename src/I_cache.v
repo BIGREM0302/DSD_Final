@@ -38,7 +38,7 @@ module I_cache(
     reg RST;
     
     always@(posedge clk) begin
-        RSR <= proc_reset;
+        RST <= proc_reset;
     end
 
     reg [127:0] mem_rdata_proc_w, mem_rdata_proc_r;

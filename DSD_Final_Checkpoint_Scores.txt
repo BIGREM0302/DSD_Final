@@ -1,8 +1,8 @@
 DSD Final Checkpoint Scores
-Student ID: B11901xxx
+Student ID: B12901024 B12901035 B12901140
 1. Baseline
-(1) Area (um2):
-(2) Total Simulation Time of given noHazard testbench (ns):
-(3) Total Simulation Time of given hasHazard testbench (ns):
-(4) Clock cycle for post-syn simulation (cycle in testbench, not cycle in sdc) (ns):
+(1) Area (um2): 245036.661605
+(2) Total Simulation Time of given noHazard testbench (ns): 1088.490
+(3) Total Simulation Time of given hasHazard testbench (ns): 9187.490
+(4) Clock cycle for post-syn simulation (cycle in testbench, not cycle in sdc) (ns): 3.49
 

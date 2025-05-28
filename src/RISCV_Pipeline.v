@@ -4,7 +4,7 @@ module ALU(
     input  signed [31:0] data1,
     input  signed [31:0] data2,
     output signed [31:0] alu_calc
-);  
+);
 
     // I think we should not use zero, because zero is in the comparator, and the branch logic is in ID/EX
     reg signed [31:0]  temp;
@@ -34,7 +34,7 @@ module comparator(
     // for branch logic in ID/EX
     assign zero = (data1 == data2);
 
-endmodule 
+endmodule
 
 module RISCV_Pipeline(
     input         clk,
@@ -54,7 +54,7 @@ module RISCV_Pipeline(
     input         DCACHE_stall, // Stall signal from data cache
     input  [31:0] DCACHE_rdata, // Data read from data cache
     // PC output
-    output [31:0] PC    
+    output [31:0] PC
 );
 
 wire stall;
@@ -69,9 +69,9 @@ reg [31:0] IF_inst_w,IF_inst_r;
 
 assign PC = PC_reg; // Output current PC value
 assign ICACHE_ren = 1'b1;
-assign ICACHE_wen = 1'b0; 
+assign ICACHE_wen = 1'b0;
 assign ICACHE_addr = PC_reg[31:2];
-assign ICACHE_wdata = 32'd0; 
+assign ICACHE_wdata = 32'd0;
 
 //ID -> Branch here ...
 
@@ -135,7 +135,7 @@ wire [31:0] WB_alu_out;
 assign WB_alu_out = (MEM_mem_to_reg_r)? MEM_rdata_r : MEM_alu_out_real_r; // Choose between memory read data and ALU output
 
 // Register file
-reg [31:0] RF_r [0:31]; 
+reg [31:0] RF_r [0:31];
 
 
 
@@ -151,7 +151,7 @@ always@(*) begin
         PC_w = PC_reg; // Hold PC if stalled
         IF_pc_w = IF_pc_r;
         IF_inst_w = IF_inst_r; // Hold instruction if stalled
-    end 
+    end
 
     else if ((bne & ~zero)| (branch & zero)| jal) begin
         PC_w = branch_jal_addr;
@@ -169,7 +169,7 @@ always@(posedge clk) begin
         PC_reg <= 32'd0; // Reset PC to 0
         IF_pc_r <= 32'd0;
         IF_inst_r <= {{25{1'b0}},{7'b0010011}};  // 25 個 0 + 0010011 -> NOP
-    end 
+    end
 
     else if (!IF_valid_w) begin
         PC_reg <= PC_w; // Update PC if not stalled
@@ -208,7 +208,7 @@ end
 always@(posedge clk) begin
     if (!rst_n) begin
         cnt_r <= 1'b0; // Reset counter
-    end 
+    end
     else begin
         cnt_r <= cnt_w; // Reset counter when not stalled
     end
@@ -226,12 +226,12 @@ always@(posedge clk) begin
         ID_mem_wen_D_r <= 1'b0;
         ID_Reg_write_r <= 1'b0;
         ID_ALU_src_r <= 1'b0;
-        ID_alu_ctrl_r <= 4'd7; 
+        ID_alu_ctrl_r <= 4'd7;
         ID_jalr_r <= 1'b0;
         ID_lw_r <= 1'b0;
-        ID_pc_w <= 32'd0; 
-    end 
-    
+        ID_pc_w <= 32'd0;
+    end
+
     else begin
         ID_rs1_r <= ID_rs1_w; // Update rs1
         ID_rs2_r <= ID_rs2_w; // Update rs2
@@ -256,18 +256,18 @@ always@(*)begin
 
     ID_rs2_w = (jal)?  32'd4 :
                (IF_inst_r[24:20] == MEM_rd_r && MEM_Reg_write_r && MEM_rd_r != 5'd0)? WB_alu_out : RF_r[{IF_inst_r[24:20]}] ;
-    
-    ID_rs1_br = (IF_inst_r[19:15] == ID_rd_r && ID_Reg_write_r && ID_rd_r != 5'd0)? EX_out_w : 
+
+    ID_rs1_br = (IF_inst_r[19:15] == ID_rd_r && ID_Reg_write_r && ID_rd_r != 5'd0)? EX_out_w :
                 (IF_inst_r[19:15] == EX_rd_r && EX_Reg_write_r && EX_rd_r != 5'd0)? MEM_alu_out:
                 (IF_inst_r[19:15] == MEM_rd_r && MEM_Reg_write_r && MEM_rd_r != 5'd0)? WB_alu_out : RF_r[{IF_inst_r[19:15]}];
 
-    ID_rs2_br = (IF_inst_r[24:20] == ID_rd_r && ID_Reg_write_r && ID_rd_r != 5'd0)? EX_out_w : 
+    ID_rs2_br = (IF_inst_r[24:20] == ID_rd_r && ID_Reg_write_r && ID_rd_r != 5'd0)? EX_out_w :
                 (IF_inst_r[24:20] == EX_rd_r && EX_Reg_write_r && EX_rd_r != 5'd0)? MEM_alu_out:
                 (IF_inst_r[24:20] == MEM_rd_r && MEM_Reg_write_r && MEM_rd_r != 5'd0)? WB_alu_out : RF_r[{IF_inst_r[24:20]}];
-               
+
     ID_rs1_addr_w = (jal)? 5'd0:IF_inst_r[19:15];
     ID_rs2_addr_w = (jal)? 5'd0:IF_inst_r[24:20];
-    ID_rd_w = IF_inst_r[11:7]; 
+    ID_rd_w = IF_inst_r[11:7];
     ID_pc_w = IF_pc_r; // Update PC for ID stage
 
     //decode
@@ -308,7 +308,7 @@ always@(*)begin
         ID_mem_wen_D_w = 1'b0;
         ID_Reg_write_w = 1'b0;
         ID_ALU_src_w = 1'b0;
-        ID_alu_ctrl_w = 4'd7; 
+        ID_alu_ctrl_w = 4'd7;
         ID_jalr_w = 1'b0;
         ID_lw_w = 1'b0;
         ID_pc_w = 32'd0; // Reset PC for jalr
@@ -316,7 +316,7 @@ always@(*)begin
 end
 
 //decode
-always@(*) begin      
+always@(*) begin
     jal         = 0;
     jalr        = 0;
     branch      = 0;
@@ -331,9 +331,9 @@ always@(*) begin
 
 
     case(IF_inst_r[6:0])  // R: add,sub,and,or,xor,slli,srai,srli,slt  I:addi,andi,ori,xori,slti,lw,jalr  S:sw  B:beq,bne  J:jal
-    
+
         // R: add,sub,and,or,xor,slt
-        7'b0110011: begin   
+        7'b0110011: begin
             Reg_write   = 1;
             alu_ctrl    = (IF_inst_r[30])? 4'd3 : {1'b0, IF_inst_r[14:12]};
         end
@@ -360,7 +360,7 @@ always@(*) begin
             immediate  = {{21{IF_inst_r[31]}},IF_inst_r[30:25],IF_inst_r[24:21],IF_inst_r[20]};
             alu_ctrl   = 4'd0;
             lw         = 1;
-        end       
+        end
 
         // I:jalr
         7'b1100111: begin
@@ -369,7 +369,7 @@ always@(*) begin
             ALU_src   = 1;
             immediate = {{21{IF_inst_r[31]}},IF_inst_r[30:25],IF_inst_r[24:21],IF_inst_r[20]};
             alu_ctrl    = 4'd0;
-        end  
+        end
 
         // S:sw
         7'b0100011: begin
@@ -432,16 +432,16 @@ always @(*) begin
     end
 end
 
-assign rs1_val = (forwardA==2'b00) ? ID_rs1_r : 
-                 (forwardA==2'b01) ? WB_alu_out : 
+assign rs1_val = (forwardA==2'b00) ? ID_rs1_r :
+                 (forwardA==2'b01) ? WB_alu_out :
                  (forwardA==2'b10) ? MEM_alu_out : 32'd0;
 
 assign rs2_val = (forwardB==2'b00) ? ID_rs2_r :
-                 (forwardB==2'b01) ? WB_alu_out : 
+                 (forwardB==2'b01) ? WB_alu_out :
                  (forwardB==2'b10) ? MEM_alu_out : 32'd0;
 
-assign EX_op1 = rs1_val; 
-assign EX_op2 = (ID_ALU_src_r) ? ID_imm_r : rs2_val; 
+assign EX_op1 = rs1_val;
+assign EX_op2 = (ID_ALU_src_r) ? ID_imm_r : rs2_val;
 
 always@(posedge clk) begin
     if (!rst_n) begin
@@ -451,8 +451,8 @@ always@(posedge clk) begin
         EX_Reg_write_r <= 1'b0;
         EX_out_r <= 32'd0;
         EX_rs2_r <= 32'd0; // Reset rs2 value
-    end 
-    
+    end
+
     else begin
         EX_rd_r <= EX_rd_w; // Update rd
         EX_mem_to_reg_r <= EX_mem_to_reg_w; // Update mem_to_reg flag
@@ -511,8 +511,8 @@ always@(posedge clk) begin
         MEM_rd_r <= 5'd0; // Reset rd
         MEM_mem_to_reg_r <= 1'b0; // Reset mem_to_reg flag
         MEM_Reg_write_r <= 1'b0; // Reset Reg write flag
-    end 
-    
+    end
+
     else begin
         MEM_rdata_r <= MEM_rdata_w; // Update memory read data
         MEM_alu_out_real_r <= MEM_alu_out_real_w;
@@ -530,9 +530,9 @@ always@(posedge clk) begin
         for (i = 0; i < 32; i = i + 1) begin
             RF_r[i] <= 32'd0;
         end
-    end 
+    end
     else if (MEM_Reg_write_r && MEM_rd_r != 5'd0) begin
-        RF_r[MEM_rd_r] <= WB_alu_out; 
+        RF_r[MEM_rd_r] <= WB_alu_out;
     end
 end
 

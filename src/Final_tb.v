@@ -85,7 +85,7 @@ module Final_tb;
 
 	reg clk;
 	reg rst_n;
-	
+
 	wire mem_read_D;
 	wire mem_write_D;
 	wire [31:4] mem_addr_D;
@@ -99,24 +99,24 @@ module Final_tb;
 	wire [127:0] mem_wdata_I;
 	wire [127:0] mem_rdata_I;
 	wire mem_ready_I;
-	
+
 	wire [29:0]	DCACHE_addr;
 	wire [31:0]	DCACHE_wdata;
 	wire 		DCACHE_wen;
-	
+
 	wire [8:0] error_num;
 	wire [15:0] duration;
-	wire finish;	
-	wire [31:0] PC; 
+	wire finish;
+	wire [31:0] PC;
 
 	// Note the design is connected at testbench, include:
 	// 1. CHIP (RISCV + D_cache + I_chache)
 	// 2. slow memory for data
 	// 3. slow memory for instruction
-	
+
 	CHIP chip0 (clk,
 				rst_n,
-//----------for slow_memD------------	
+//----------for slow_memD------------
 				mem_read_D,
 				mem_write_D,
 				mem_addr_D,
@@ -130,7 +130,7 @@ module Final_tb;
 				mem_wdata_I,
 				mem_rdata_I,
 				mem_ready_I,
-//----------for TestBed--------------				
+//----------for TestBed--------------
 				DCACHE_addr,
 				DCACHE_wdata,
 				DCACHE_wen,
@@ -169,11 +169,11 @@ module Final_tb;
 		.finish     (finish)
 	);
 	// INFO: PC for QSort TestBed, duration for others. For uniformity, all TestBeds have both ports.
-	
+
 `ifdef SDF
     initial $sdf_annotate(`SDFFILE, chip0);
 `endif
-	
+
 integer i;
 // Initialize the data memory
 	initial begin
@@ -182,7 +182,7 @@ integer i;
 			slow_memI.mem[i] = 32'h13_00_00_00; // padding the IMEM with NOP instruction
 		end
 		$readmemh (`IMEM_INIT, slow_memI.mem ); // initialize data in IMEM
-		
+
 		$display("-----------------------------------------------------\n");
 	 	$display("START!!! Simulation Start .....\n");
 	 	$display("-----------------------------------------------------\n");
@@ -194,12 +194,12 @@ integer i;
 		$fsdbDumpfile("Final.fsdb");
 		$fsdbDumpvars(0,Final_tb,"+mda");
 		$fsdbDumpvars;
-	
+
 		clk = 1;
 		rst_n = 1'b1;
 		#(`CYCLE*1.6) rst_n = 1'b0;
 		#(`CYCLE*5.0) rst_n = 1'b1;
-     
+
 		#(`CYCLE * `MAX_CYCLES) // calculate clock cycles for all operation (you can modify it)
 		$display("============================================================================");
 		$display("\n           Error!!! There is something wrong with your code ...!          ");
@@ -214,11 +214,11 @@ integer i;
 		`endif
 	 	$finish;
 	end
-		
+
 	always #(`CYCLE*0.5) clk = ~clk;
-	
+
 	always@(finish)
 	    if(finish)
-	       #(`CYCLE) $finish;		   
-	
+	       #(`CYCLE) $finish;
+
 endmodule

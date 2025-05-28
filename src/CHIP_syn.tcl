@@ -13,6 +13,7 @@ current_design [get_designs $DESIGN]
 source CHIP_syn.sdc
 
 compile_ultra -no_autoungroup
+#compile
 
 #####################################################
 

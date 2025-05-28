@@ -10,7 +10,7 @@ module ALU(
     reg signed [31:0]  temp;
 
     always @(*) begin
-        case (alu_ctrl) // synopsys parallel_case full_case
+        case (alu_ctrl)
             4'd0:       temp = data1 + data2;
             4'd3,4'd2:  temp = data1 - data2;
             4'd7:       temp = data1 & data2;
@@ -19,6 +19,7 @@ module ALU(
             4'd1:       temp = data1 << data2[4:0];
             4'd5:       temp = data1 >> data2[4:0];
             4'd8:       temp = data1 >>> data2[4:0];
+            default:    temp = data1 & data2;
         endcase
     end
 

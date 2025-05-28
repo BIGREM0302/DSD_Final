@@ -137,8 +137,6 @@ assign WB_alu_out = (MEM_mem_to_reg_r)? MEM_rdata_r : MEM_alu_out_real_r; // Cho
 // Register file
 reg [31:0] RF_r [0:31]; 
 
-
-
 ////////////////////////// IF Stage //////////////////////////
 always@(*) begin
     PC_w = $signed(PC_reg) + $signed(32'd4); // Increment PC by 4 for next instruction
@@ -146,12 +144,17 @@ always@(*) begin
     IF_pc_w = PC_reg; // Update IF stage PC
     IF_inst_w = {ICACHE_rdata[7:0],ICACHE_rdata[15:8],ICACHE_rdata[23:16],ICACHE_rdata[31:24]}; // Read instruction from I-cache
 
-
     if(stall) begin
         PC_w = PC_reg; // Hold PC if stalled
         IF_pc_w = IF_pc_r;
         IF_inst_w = IF_inst_r; // Hold instruction if stalled
     end 
+
+    else if(cnt_w) begin
+        PC_w = PC_reg; // Update PC if not stalled
+        IF_pc_w = IF_pc_r;
+        IF_inst_w = IF_inst_r;
+    end
 
     else if ((bne & ~zero)| (branch & zero)| jal) begin
         PC_w = branch_jal_addr;
@@ -177,12 +180,6 @@ always@(posedge clk) begin
         IF_inst_r <= {{25{1'b0}},{7'b0010011}};
     end
 
-    else if(cnt_w) begin
-        PC_reg <= PC_reg; // Update PC if not stalled
-        IF_pc_r <= IF_pc_r;
-        IF_inst_r <= IF_inst_r;
-    end
-
     else begin
         PC_reg <= PC_w; // Update PC if not stalled
         IF_pc_r <= IF_pc_w;
@@ -195,12 +192,14 @@ assign hazard = ID_lw_r && ((ID_rs1_addr_w == ID_rd_r) || (ID_rs2_addr_w == ID_r
 
 always@(*) begin
     cnt_w = cnt_r; // Default to hold the counter value
-    if(cnt_r) begin
-        cnt_w = 1'b0; // Reset counter if it reaches 1
-    end
+    if(!stall) begin
+        if(cnt_r) begin
+            cnt_w = 1'b0; // Reset counter if it reaches 1
+        end
 
-    else if(hazard) begin
-        cnt_w = 1'b1; // Increment counter if not stalled or hazard detected
+        else if(hazard) begin
+            cnt_w = 1'b1; // Increment counter if not stalled or hazard detected
+        end
     end
 end
 
@@ -215,7 +214,7 @@ always@(posedge clk) begin
 end
 
 always@(posedge clk) begin
-    if (!rst_n || cnt_w) begin
+    if (!rst_n) begin
         ID_rs1_r <= 32'd0;
         ID_rs2_r <= 32'd0;
         ID_rs1_addr_r <= 5'd0; // Reset rs1 address
@@ -229,8 +228,25 @@ always@(posedge clk) begin
         ID_alu_ctrl_r <= 4'd7; 
         ID_jalr_r <= 1'b0;
         ID_lw_r <= 1'b0;
-        ID_pc_w <= 32'd0; 
+        ID_pc_r <= 32'd0; 
     end 
+
+    else if(cnt_w && ~stall) begin
+        ID_rs1_r <= 32'd0;
+        ID_rs2_r <= 32'd0;
+        ID_rs1_addr_r <= 5'd0; // Reset rs1 address
+        ID_rs2_addr_r <= 5'd0; // Reset rs2 address
+        ID_rd_r <= 5'd0;
+        ID_imm_r <= 32'd0;
+        ID_mem_to_reg_r <= 1'b0;
+        ID_mem_wen_D_r <= 1'b0;
+        ID_Reg_write_r <= 1'b0;
+        ID_ALU_src_r <= 1'b0;
+        ID_alu_ctrl_r <= 4'd7; 
+        ID_jalr_r <= 1'b0;
+        ID_lw_r <= 1'b0;
+        ID_pc_r <= 32'd0;
+    end
     
     else begin
         ID_rs1_r <= ID_rs1_w; // Update rs1
@@ -483,7 +499,7 @@ end
 
 ////////////////////////// MEM Stage //////////////////////////
 
-assign DCACHE_ren = !EX_mem_wen_D_r; // Read enable for D-cache
+assign DCACHE_ren = ~EX_mem_wen_D_r; // Read enable for D-cache
 assign DCACHE_wen = EX_mem_wen_D_r; // Write enable for D-cache
 assign DCACHE_addr = MEM_alu_out[31:2]; // Address for D-cache
 assign DCACHE_wdata = {MEM_wdata[7:0],MEM_wdata[15:8],MEM_wdata[23:16],MEM_wdata[31:24]}; // Data to write to D-cache

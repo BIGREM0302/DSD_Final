@@ -35,6 +35,12 @@ module D_cache(
     integer i;
 
     // protect
+    reg RST;
+    
+    always@(posedge clk) begin
+        RSR <= proc_reset;
+    end
+
     reg [127:0] mem_rdata_proc_w, mem_rdata_proc_r;
     reg cnt_w,cnt_r;
     
@@ -44,7 +50,7 @@ module D_cache(
     end
 
     always@(posedge clk)begin
-        cnt_r <= mem_ready;
+        cnt_r <= cnt_w;
         mem_rdata_proc_r <= mem_rdata_proc_w;
     end
 
@@ -165,7 +171,7 @@ end
 
 //==== sequential circuit =================================
 always@( posedge clk ) begin
-    if( proc_reset ) begin
+    if( RST ) begin
         state_r <= COMP;
         for(i = 0; i < 8; i = i + 1)begin
             cache[i] <= 0;

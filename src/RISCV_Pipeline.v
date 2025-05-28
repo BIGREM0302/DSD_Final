@@ -57,6 +57,12 @@ module RISCV_Pipeline(
     output [31:0] PC    
 );
 
+reg RST_n;
+always@(posedge clk) begin
+    RST_n <= rst_n;
+end
+
+
 wire stall;
 assign stall = ICACHE_stall || DCACHE_stall; // Global stall signal
 
@@ -168,7 +174,7 @@ always@(*) begin
 end
 
 always@(posedge clk) begin
-    if (!rst_n) begin
+    if (!RST_n) begin
         PC_reg <= 32'd0; // Reset PC to 0
         IF_pc_r <= 32'd0;
         IF_inst_r <= {{25{1'b0}},{7'b0010011}};  // 25 個 0 + 0010011 -> NOP
@@ -205,7 +211,7 @@ end
 
 
 always@(posedge clk) begin
-    if (!rst_n) begin
+    if (!RST_n) begin
         cnt_r <= 1'b0; // Reset counter
     end 
     else begin
@@ -214,7 +220,7 @@ always@(posedge clk) begin
 end
 
 always@(posedge clk) begin
-    if (!rst_n) begin
+    if (!RST_n) begin
         ID_rs1_r <= 32'd0;
         ID_rs2_r <= 32'd0;
         ID_rs1_addr_r <= 5'd0; // Reset rs1 address
@@ -460,7 +466,7 @@ assign EX_op1 = rs1_val;
 assign EX_op2 = (ID_ALU_src_r) ? ID_imm_r : rs2_val; 
 
 always@(posedge clk) begin
-    if (!rst_n) begin
+    if (!RST_n) begin
         EX_rd_r <= 5'd0;
         EX_mem_to_reg_r <= 1'b0;
         EX_mem_wen_D_r <= 1'b0;
@@ -521,7 +527,7 @@ always@(*) begin
 end
 
 always@(posedge clk) begin
-    if (!rst_n) begin
+    if (!RST_n) begin
         MEM_rdata_r <= 32'd0; // Reset memory read data
         MEM_alu_out_real_r <= 32'd0;
         MEM_rd_r <= 5'd0; // Reset rd
@@ -541,7 +547,7 @@ end
 ////////////////////////// WB Stage //////////////////////////
 integer i;
 always@(posedge clk) begin
-    if (!rst_n) begin
+    if (!RST_n) begin
         // Reset register file to zero
         for (i = 0; i < 32; i = i + 1) begin
             RF_r[i] <= 32'd0;

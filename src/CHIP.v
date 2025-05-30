@@ -15,11 +15,11 @@ module CHIP (	clk,
 				mem_wdata_I,
 				mem_rdata_I,
 				mem_ready_I,
-//----------for TestBed--------------				
-				DCACHE_addr, 
+//----------for TestBed--------------
+				DCACHE_addr,
 				DCACHE_wdata,
 				DCACHE_wen,
-				PC   
+				PC
 			);
 input			clk, rst_n;
 //--------------------------
@@ -70,9 +70,9 @@ wire [31:0] PC;
 
 	RISCV_Pipeline i_RISCV(
 		// control interface
-		.clk            (clk)           , 
+		.clk            (clk)           ,
 		.rst_n          (rst_n)         ,
-//----------I cache interface-------		
+//----------I cache interface-------
 		.ICACHE_ren     (ICACHE_ren)    ,
 		.ICACHE_wen     (ICACHE_wen)    ,
 		.ICACHE_addr    (ICACHE_addr)   ,
@@ -89,7 +89,7 @@ wire [31:0] PC;
 //--------------PC-----------------
 		.PC(PC)
 	);
-	
+
 
 	D_cache D_cache(
         .clk        (clk)         ,

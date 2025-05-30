@@ -7,7 +7,7 @@ vcs Final_tb.v rtl_files.v slow_memory.v -full64 -R -debug_access+all +v2k +defi
 
 ## Gate level - Baseline
 
-vcs Final_tb.v ./Netlsit/CHIP_syn.v slow_memory.v -v tsmc13.v -full64 -R -debug_access+all +v2k +define+noHazard +define+SDF
+vcs Final_tb.v ./Netlist/CHIP_syn.v slow_memory.v -v tsmc13.v -full64 -R -debug_access+all +v2k +define+noHazard +define+SDF
 vcs Final_tb.v ./Netlist/CHIP_syn.v slow_memory.v -v tsmc13.v -full64 -R -debug_access+all +v2k +define+hasHazard +define+SDF
 
 ## RTL - Extension

@@ -170,6 +170,7 @@ always @(*) begin
             RVC_buffer_w   = temp[31:16];
             buffer_valid_w = 1'b1;
             IF_inst_w      = {{25{1'b0}}, {7'b0010011}};
+            IF_pc_w        = IF_pc_r;
         end
 
         else begin
@@ -209,7 +210,7 @@ always @(*) begin
         IF_inst_w      = DecompOut;
         PC_w           = PC_reg + 32'd4;
         RVC_buffer_w   = temp[31:16];
-        buffer_valid_w = 1;
+        buffer_valid_w = 1'b1;
     end
 
     if (stall) begin

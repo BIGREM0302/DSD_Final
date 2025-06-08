@@ -164,8 +164,7 @@ always @(*) begin
     DecompIn   = 16'd0;
 
     if (PC_reg[1:0] == 2'b10) begin
-        IF_pc_w = PC_reg + 32'd2;
-        PC_w    = PC_reg + 32'd2;
+        PC_w = PC_reg + 32'd2;
 
         if (temp[17:16] == 2'b11) begin
             RVC_buffer_w   = temp[31:16];
@@ -184,6 +183,7 @@ always @(*) begin
     else if (RVC_buffer_r[1:0] == 2'b11 && buffer_valid_r == 1'b1) begin
         IF_inst_w      = {temp[15:0], RVC_buffer_r};
         PC_w           = PC_reg + 32'd4;
+        IF_pc_w        = PC_reg - 32'd2;
         RVC_buffer_w   = {temp[31:16]};
         buffer_valid_w = 1'b1;
     end
@@ -192,6 +192,7 @@ always @(*) begin
         DecompIn       = RVC_buffer_r;
         IF_inst_w      = DecompOut;
         PC_w           = PC_reg;
+        IF_pc_w        = PC_reg - 32'd2;
         RVC_buffer_w   = 16'd0;
         buffer_valid_w = 1'b0;
     end

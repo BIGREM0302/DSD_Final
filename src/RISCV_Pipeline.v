@@ -142,53 +142,101 @@ assign WB_alu_out = (MEM_mem_to_reg_r) ? MEM_rdata_r : MEM_alu_out_real_r; // Ch
 // Register file
 reg [31:0] RF_r [0:31];
 
+reg [15:0] RVC_buffer_w, RVC_buffer_r;
+reg        buffer_valid_w, buffer_valid_r;
+
 ////////////////////////// IF Stage //////////////////////////
 always @(*) begin
-    PC_w       = $signed(PC_reg) + $signed(32'd4); // Increment PC by 4 for next instruction
-    IF_valid_w = 1'b1;                             // Set IF stage valid flag
-    IF_pc_w    = PC_reg;                           // Update IF stage PC
-    IF_inst_w  = {ICACHE_rdata[7:0], ICACHE_rdata[15:8], ICACHE_rdata[23:16], ICACHE_rdata[31:24]}; // Read instruction from I-cache
+    PC_w       = PC_reg + 32'd4; // Default PC increment by 4
+    IF_valid_w = 1'b1;           // Set IF stage valid flag
+    IF_pc_w    = PC_reg;         // Update IF stage PC
+    IF_inst_w  = 32'd0;
+    temp       = {ICACHE_rdata[7:0], ICACHE_rdata[15:8], ICACHE_rdata[23:16], ICACHE_rdata[31:24]}; // Read instruction from I-cache
+
+    if (RVC_buffer_r[1:0] == 2'b11 && buffer_valid_r == 1'b1) begin
+        IF_inst_w      = {temp[15:0], RVC_buffer_r};
+        PC_w           = PC_reg + 32'd4;
+        RVC_buffer_w   = {temp[31:16]};
+        buffer_valid_w = 1'b1;
+    end
+
+    else if (RVC_buffer_r[1:0] != 2'b11 && buffer_valid_r == 1'b1) begin
+        DecompIn       = RVC_buffer_r;
+        IF_inst_w      = DecompOut;
+        PC_w           = PC_reg;
+        RVC_buffer_w   = 16'd0;
+        buffer_valid_w = 1'b0;
+    end
+
+    else if (temp[1:0] == 2'b11 && buffer_valid_r == 1'b0) begin
+        IF_inst_w      = temp;
+        PC_w           = PC_reg + 32'd4;
+        RVC_buffer_w   = 16'd0;
+        buffer_valid_w = 1'b0;
+    end
+
+    else if (temp[1:0] != 2'b11 && buffer_valid_r == 1'b0) begin
+        DecompIn       = temp[15:0];
+        IF_inst_w      = DecompOut;
+        PC_w           = PC_reg + 32'd4;
+        RVC_buffer_w   = temp[31:16];
+        buffer_valid_w = 1;
+    end
 
     if (stall) begin
-        PC_w      = PC_reg;    // Hold PC if stalled
-        IF_pc_w   = IF_pc_r;
-        IF_inst_w = IF_inst_r; // Hold instruction if stalled
+        PC_w           = PC_reg;         // Hold PC if stalled
+        IF_pc_w        = IF_pc_r;
+        IF_inst_w      = IF_inst_r;      // Hold instruction if stalled
+        RVC_buffer_w   = RVC_buffer_r;   // Hold RVC buffer if stalled
+        buffer_valid_w = buffer_valid_r; // Hold buffer valid flag if stalled
     end
 
     else if (cnt_w) begin
-        PC_w      = PC_reg; // Update PC if not stalled
-        IF_pc_w   = IF_pc_r;
-        IF_inst_w = IF_inst_r;
+        PC_w           = PC_reg; // Update PC if not stalled
+        IF_pc_w        = IF_pc_r;
+        IF_inst_w      = IF_inst_r;
+        RVC_buffer_w   = RVC_buffer_r;
+        buffer_valid_w = buffer_valid_r;
     end
 
     else if ((bne & ~zero) | (branch & zero) | jal) begin
-        PC_w       = branch_jal_addr;
-        IF_valid_w = 1'b0;
+        PC_w           = branch_jal_addr;
+        IF_valid_w     = 1'b0;
+        RVC_buffer_w   = 16'd0;
+        buffer_valid_w = 1'b0;
     end
 
     else if (ID_jalr_r) begin
-        PC_w       = alu_result;
-        IF_valid_w = 1'b0;
+        PC_w           = alu_result;
+        IF_valid_w     = 1'b0;
+        RVC_buffer_w   = 16'd0;
+        buffer_valid_w = 1'b0;
     end
 end
 
 always @(posedge clk) begin
     if (!RST_n) begin
-        PC_reg    <= 32'd0; // Reset PC to 0
-        IF_pc_r   <= 32'd0;
-        IF_inst_r <= {{25{1'b0}}, {7'b0010011}};  // 25 0's + 0010011 -> NOP
+        PC_reg         <= 32'd0;                      // Reset PC to 0
+        IF_pc_r        <= 32'd0;
+        IF_inst_r      <= {{25{1'b0}}, {7'b0010011}}; // 25 0's + 0010011 -> NOP
+        RVC_buffer_r   <= 16'd0;                      // Reset RVC buffer
+        buffer_valid_r <= 1'b0;                       // Reset buffer valid flag
     end
 
     else if (!IF_valid_w) begin
-        PC_reg    <= PC_w;    // Update PC if not stalled
-        IF_pc_r   <= IF_pc_w; // Hold PC if stalled
-        IF_inst_r <= {{25{1'b0}}, {7'b0010011}};
+        PC_reg         <= PC_w;                       // Update PC if not stalled
+        IF_pc_r        <= IF_pc_w;                    // Hold PC if stalled
+        IF_inst_r      <= {{25{1'b0}}, {7'b0010011}};
+        RVC_buffer_r   <= 16'd0;                      // Reset RVC buffer
+        buffer_valid_r <= 1'b0;                       // Reset buffer valid flag
     end
 
     else begin
-        PC_reg    <= PC_w;      // Update PC if not stalled
-        IF_pc_r   <= IF_pc_w;
-        IF_inst_r <= IF_inst_w; // Update instruction if not stalled
+        PC_reg         <= PC_w;           // Update PC if not stalled
+        IF_pc_r        <= IF_pc_w;
+        IF_inst_r      <= IF_inst_w;      // Update instruction if not stalled
+        RVC_buffer_r   <= RVC_buffer_w;   // Update RVC buffer
+        buffer_valid_r <= buffer_valid_w; // Update buffer valid flag
     end
 end
 

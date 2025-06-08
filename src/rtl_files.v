@@ -2,4 +2,5 @@
 `include "D_cache.v"
 `include "I_cache.v"
 `include "RISCV_Pipeline.v"
+`include "decompressor.v"
 /// Add other verilog files here for example: `include "cache.v"

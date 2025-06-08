@@ -72,6 +72,7 @@ reg        IF_valid_w;
 reg [31:0] IF_pc_w, IF_pc_r;
 reg [31:0] IF_inst_w, IF_inst_r;
 
+reg [31:0] temp;
 reg [15:0] RVC_buffer_w, RVC_buffer_r;
 reg        buffer_valid_w, buffer_valid_r;
 

@@ -72,6 +72,12 @@ reg        IF_valid_w;
 reg [31:0] IF_pc_w, IF_pc_r;
 reg [31:0] IF_inst_w, IF_inst_r;
 
+reg [15:0] RVC_buffer_w, RVC_buffer_r;
+reg        buffer_valid_w, buffer_valid_r;
+
+reg  [15:0] DecompIn;
+wire [31:0] DecompOut;
+
 assign PC           = PC_reg; // Output current PC value
 assign ICACHE_ren   = 1'b1;
 assign ICACHE_wen   = 1'b0;
@@ -142,18 +148,39 @@ assign WB_alu_out = (MEM_mem_to_reg_r) ? MEM_rdata_r : MEM_alu_out_real_r; // Ch
 // Register file
 reg [31:0] RF_r [0:31];
 
-reg [15:0] RVC_buffer_w, RVC_buffer_r;
-reg        buffer_valid_w, buffer_valid_r;
-
 ////////////////////////// IF Stage //////////////////////////
+decompressor decomp(
+    .c(DecompIn),
+    .r(DecompOut)
+);
+
 always @(*) begin
     PC_w       = PC_reg + 32'd4; // Default PC increment by 4
     IF_valid_w = 1'b1;           // Set IF stage valid flag
     IF_pc_w    = PC_reg;         // Update IF stage PC
     IF_inst_w  = 32'd0;
     temp       = {ICACHE_rdata[7:0], ICACHE_rdata[15:8], ICACHE_rdata[23:16], ICACHE_rdata[31:24]}; // Read instruction from I-cache
+    DecompIn   = 16'd0;
 
-    if (RVC_buffer_r[1:0] == 2'b11 && buffer_valid_r == 1'b1) begin
+    if (PC_reg[1:0] == 2'b10) begin
+        IF_pc_w = PC_reg + 32'd2;
+        PC_w    = PC_reg + 32'd2;
+
+        if (temp[17:16] == 2'b11) begin
+            RVC_buffer_w   = temp[31:16];
+            buffer_valid_w = 1'b1;
+            IF_inst_w      = {{25{1'b0}}, {7'b0010011}};
+        end
+
+        else begin
+            RVC_buffer_w   = 16'd0;
+            buffer_valid_w = 1'b0;
+            DecompIn       = temp[31:16];
+            IF_inst_w      = DecompOut;
+        end
+    end
+
+    else if (RVC_buffer_r[1:0] == 2'b11 && buffer_valid_r == 1'b1) begin
         IF_inst_w      = {temp[15:0], RVC_buffer_r};
         PC_w           = PC_reg + 32'd4;
         RVC_buffer_w   = {temp[31:16]};

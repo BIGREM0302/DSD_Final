@@ -17,7 +17,7 @@ module PredictionUnit (
 
     assign BrPre = counter[1];
 
-    always @(posedge clk or negedge rst_n) begin
+    always @(posedge clk) begin
         if (!rst_n) begin
             counter <= 2'b01;
         end

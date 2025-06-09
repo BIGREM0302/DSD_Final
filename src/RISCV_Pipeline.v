@@ -37,47 +37,40 @@ module comparator(
 endmodule 
 
 module PredictionUnit (
-    output BrPre,          // 1: predict taken, 0: predict not-taken
+    output BrPre,          
     input  clk,
     input  rst_n,
-    input  stall,          // pipeline stall
-    input  PreWrong,       // 1: mis-prediction on this branch
-    input  B               // 1: the inst. in IF is a branch inst.
+    input  stall,          
+    input  PreWrong,       
+    input  B               
 );
-
     // 2-bit saturating counter：00,01,10,11
     // 00 : Strongly Not-Taken
     // 01 : Weakly Not-Taken
     // 10 : Weakly Taken
     // 11 : Strongly Taken
-    
-    reg [1:0] counter;
 
-    assign BrPre = counter[1];
-
+    reg [1:0] ctr_r;
+    assign BrPre = ctr_r[1]; 
     always @(posedge clk) begin
         if (!rst_n) begin
-            counter <= 2'b01;
+            ctr_r <= 2'b01;
         end
         else if (!stall && B) begin
-            if (BrPre) begin
+            if (BrPre) begin                
                 if (PreWrong) begin
-                    if (counter != 2'b00)
-                        counter <= counter - 1'b1;
+                        ctr_r <= (ctr_r - 2'b01);
                 end
                 else begin
-                    if (counter != 2'b11)
-                        counter <= counter + 1'b1;
-                end
+                        ctr_r <= 2'b11;
+                end   
             end
             else begin
                 if (PreWrong) begin
-                    if (counter != 2'b11)
-                        counter <= counter + 1'b1;
+                        ctr_r <= (ctr_r + 2'b01);
                 end
                 else begin
-                    if (counter != 2'b00)
-                        counter <= counter - 1'b1;
+                        ctr_r <= 2'b00;
                 end
             end
         end
@@ -129,8 +122,10 @@ reg         [31:0] IF_inst_w,IF_inst_r;
 reg [31:0] IF_branch_always_addr_w, IF_branch_always_addr_r; // if we pred: no, but branch need to be taken -> we can directly use this!!
 wire [31:0] IF_immediate;
 wire IF_B;
+wire IF_BrPre_container;
 wire IF_BrPre;
 reg  IF_BrPre_w, IF_BrPre_r;
+reg  IF_B_w, IF_B_r;
 
 /////////////////////////////////////////// ID Stage Variable //////////////////////////////////////////
 
@@ -168,8 +163,8 @@ wire                branch;
 wire signed [31:0]  branch_addr;
 wire                zero;
 wire                brahcn_wrong;    
-reg                 ID_PreWrong_w   , ID_PreWrong_r;
 wire        [31:0]  ID_rs1_br       , ID_rs2_br;
+wire                ID_B;
 
 comparator cpr(.data1(ID_rs1_br), .data2(ID_rs2_br), .zero(zero));
 
@@ -224,10 +219,12 @@ assign ICACHE_wdata = 32'd0;
 
 assign IF_immediate = {{20{IF_inst_w[31]}},IF_inst_w[7],IF_inst_w[30:25],IF_inst_w[11:8],1'b0};
 assign IF_B = (IF_inst_w[6:0] == 7'b1100011); 
+assign IF_BrPre = IF_BrPre_container & IF_B;
 
 assign branch                = (beq & (zero)) | (bne & (~zero));
 assign branch_addr           = (IF_BrPre_r)? IF_pc_plus_four_r : IF_branch_always_addr_r; // jump back or jump to target !
-assign brahcn_wrong          = (branch & (~IF_BrPre_r)) | (IF_BrPre_r & (~branch));
+assign brahcn_wrong          = ID_B & ((branch & (~IF_BrPre_r)) | (IF_BrPre_r & (~branch)));
+assign ID_B                  = IF_B_r;
 
 // we need to debug this !!! branch / load hazard
 assign ID_rs1_br             = (IF_inst_r[19:15] == ID_rd_r  && ID_Reg_write_r  && ID_rd_r  != 5'd0)? EX_out_w : 
@@ -245,12 +242,12 @@ assign WB_out_w = (MEM_mem_to_reg_r)? MEM_rdata_r : MEM_alu_out_r; // Choose bet
 ////////////////////////// IF Stage //////////////////////////
 
 PredictionUnit br_pred(
-    .BrPre(IF_BrPre),
+    .BrPre(IF_BrPre_container),
     .clk(clk),
     .rst_n(RST_n),
     .stall(stall | hazard),
-    .PreWrong(ID_PreWrong_r),
-    .B(IF_B) 
+    .PreWrong(brahcn_wrong),
+    .B(ID_B) 
 );
 
 always@(*) begin
@@ -261,6 +258,7 @@ always@(*) begin
     IF_pc_plus_four_w    = PC_temp_add; 
     IF_inst_w            = {ICACHE_rdata[7:0],ICACHE_rdata[15:8],ICACHE_rdata[23:16],ICACHE_rdata[31:24]}; 
     IF_BrPre_w           = (IF_B)? IF_BrPre : IF_BrPre_r;
+    IF_B_w               = IF_B;
 
     // Case1: D$,I$ stall or Load-use hazard
     if(stall | hazard) begin
@@ -269,6 +267,7 @@ always@(*) begin
         IF_inst_w = IF_inst_r; 
         IF_branch_always_addr_w = IF_branch_always_addr_r; 
         IF_BrPre_w = IF_BrPre_r;
+        IF_B_w = IF_B_r;
     end 
 
     // Case2: Branch predict wrong -> need to flush IF, and jump to right address
@@ -293,6 +292,7 @@ always@(posedge clk) begin
         IF_inst_r <= {{25{1'b0}},{7'b0010011}};  
         IF_branch_always_addr_r <= 32'd0;
         IF_BrPre_r <= 1'b0; 
+        IF_B_r <= 1'b0; 
     end 
 
     else if (!IF_valid_w) begin
@@ -301,6 +301,7 @@ always@(posedge clk) begin
         IF_inst_r <= {{25{1'b0}},{7'b0010011}};
         IF_branch_always_addr_r <= 32'd0;
         IF_BrPre_r <= IF_BrPre_w;
+        IF_B_r <= IF_B_w; 
     end
 
     else begin
@@ -308,7 +309,8 @@ always@(posedge clk) begin
         IF_pc_plus_four_r <= IF_pc_plus_four_w;
         IF_inst_r <= IF_inst_w; 
         IF_branch_always_addr_r <= IF_branch_always_addr_w; 
-        IF_BrPre_r <= IF_BrPre_w; // Update the IF stage
+        IF_BrPre_r <= IF_BrPre_w; 
+        IF_B_r <= IF_B_w; 
     end
 
 end
@@ -333,7 +335,6 @@ always@(*)begin
     ID_alu_ctrl_w             =                 alu_ctrl;
     ID_jump_w                 =                 jalr | jal;
     ID_pc_plus_four_w         =                 IF_pc_plus_four_r; 
-    ID_PreWrong_w             =                 brahcn_wrong;
 
     if(stall) begin
         ID_rs1_w = ID_rs1_r;
@@ -349,7 +350,6 @@ always@(*)begin
         ID_alu_ctrl_w = ID_alu_ctrl_r;
         ID_jump_w = ID_jump_r;
         ID_pc_plus_four_w = ID_pc_plus_four_r;
-        ID_PreWrong_w = ID_PreWrong_r;
     end
 
 end
@@ -453,7 +453,6 @@ always@(posedge clk) begin
         ID_alu_ctrl_r <= 4'd7; 
         ID_jump_r <= 1'b0;
         ID_pc_plus_four_r <= 32'd0; 
-        ID_PreWrong_r <= 1'b0; 
     end 
 
     else begin
@@ -470,7 +469,6 @@ always@(posedge clk) begin
         ID_alu_ctrl_r <= ID_alu_ctrl_w; 
         ID_jump_r <= ID_jump_w;
         ID_pc_plus_four_r <= ID_pc_plus_four_w;
-        ID_PreWrong_r <= ID_PreWrong_w; 
     end
 end
 

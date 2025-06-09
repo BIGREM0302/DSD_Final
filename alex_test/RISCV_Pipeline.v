@@ -159,6 +159,8 @@ reg                 ID_ALU_src_w              , ID_ALU_src_r;
 reg         [3:0 ]  ID_alu_ctrl_w             , ID_alu_ctrl_r;
 reg                 ID_jump_w                 , ID_jump_r;
 reg         [31:0]  ID_pc_plus_four_w         , ID_pc_plus_four_r;
+wire signed [31:0]  ID_pc_w;
+assign ID_pc_w = $signed(IF_pc_plus_four_r) - $signed(32'd4);
 
 // Branch, check whether Prediction is correct or wrong ?
 wire                branch;
@@ -193,7 +195,7 @@ assign     hazard = ID_mem_to_reg_r && ((ID_rs1_addr_w == ID_rd_r) || (ID_rs2_ad
 always@(*)begin
 
     // WB half cycle :) -> directly choose it from WB 
-    ID_rs1_w = (IF_inst_r[19:15] == MEM_rd_r && MEM_Reg_write_r && MEM_rd_r != 5'd0)? WB_out_w : RF_r[{IF_inst_r[19:15]}] ;
+    ID_rs1_w = (jal)? ID_pc_w:(IF_inst_r[19:15] == MEM_rd_r && MEM_Reg_write_r && MEM_rd_r != 5'd0)? WB_out_w : RF_r[{IF_inst_r[19:15]}] ;
     ID_rs2_w = (IF_inst_r[24:20] == MEM_rd_r && MEM_Reg_write_r && MEM_rd_r != 5'd0)? WB_out_w : RF_r[{IF_inst_r[24:20]}] ;
 
     ID_rs1_addr_w             = (jal)? 5'd0  :  IF_inst_r[19:15];

@@ -274,6 +274,7 @@ always@(*) begin
     else if (brahcn_wrong) begin
         PC_w = branch_addr;
         IF_valid_w = 1'b0;
+        // IF_BrPre_w = 1'b0 we can use this instead of ID_B & ... for brahcn_wrong;
     end
 
     // Case3: Jal/Jalr -> need to flush IF,ID

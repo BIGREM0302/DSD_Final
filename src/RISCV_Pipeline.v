@@ -477,6 +477,17 @@ wire IF_BrPre;
 reg  IF_BrPre_w, IF_BrPre_r;
 reg  IF_B_w, IF_B_r;
 
+// Compress instruction
+wire       C1,C2;
+wire       buffer_C, buffer_I;
+reg [31:0] temp;
+reg [15:0] RVC_buffer_w, RVC_buffer_r;
+reg        buffer_valid_w, buffer_valid_r;
+
+
+reg  [15:0] DecompIn;
+wire [31:0] DecompOut;
+
 /////////////////////////////////////////// ID Stage Variable //////////////////////////////////////////
 
 // Instruction Decode Signal
@@ -565,8 +576,14 @@ reg         [31:0] RF_r [0:31];
 /////////////////////////////////////////// Trash :) //////////////////////////////////////////
 
 
-assign PC_temp_add = $signed(PC_reg) + $signed(32'd4);
+assign PC_temp_add = ((~buffer_valid_r) & C1 & C2)?$signed(PC_reg) + $signed(32'd2):
+
+                     (buffer_valid_r)? $signed(PC_reg) - $signed(32'd2):$signed(PC_reg) + $signed(32'd4);
+
+                     
+
 assign PC = PC_reg; 
+
 assign ICACHE_ren = 1'b1;
 assign ICACHE_wen = 1'b0; 
 assign ICACHE_addr = PC_reg[31:2];
@@ -575,6 +592,11 @@ assign ICACHE_wdata = 32'd0;
 assign IF_immediate = {{20{IF_inst_w[31]}},IF_inst_w[7],IF_inst_w[30:25],IF_inst_w[11:8],1'b0};
 assign IF_B = (IF_inst_w[6:0] == 7'b1100011); 
 assign IF_BrPre = IF_BrPre_container & IF_B;
+
+assign C2 = temp[1:0] != 2'b11;
+assign buffer_I = (RVC_buffer_r[1:0] == 2'b11);
+assign buffer_C = (RVC_buffer_r[1:0] != 2'b11);
+
 
 assign branch                = (beq & (zero)) | (bne & (~zero));
 assign branch_addr           = (IF_BrPre_r)? IF_pc_plus_four_r : IF_branch_always_addr_r; // jump back or jump to target !
@@ -606,15 +628,26 @@ PredictionUnit br_pred(
     .B(ID_B) 
 );
 
+decompressor decomp(
+    .c(DecompIn),
+    .r(DecompOut)
+);
+
 always@(*) begin
 
     IF_branch_always_addr_w = $signed(PC_reg) + $signed(IF_immediate); 
-    PC_w                 = (IF_BrPre)? IF_branch_always_addr_w : PC_temp_add;
-    IF_valid_w           = 1'b1; 
-    IF_pc_plus_four_w    = PC_temp_add; 
-    IF_inst_w            = {ICACHE_rdata[7:0],ICACHE_rdata[15:8],ICACHE_rdata[23:16],ICACHE_rdata[31:24]}; 
-    IF_BrPre_w           = (IF_B)? IF_BrPre : IF_BrPre_r;
-    IF_B_w               = IF_B;
+    PC_w                    = (IF_BrPre)? IF_branch_always_addr_w : PC_temp_add;
+    IF_valid_w              = 1'b1; 
+    IF_pc_plus_four_w       = PC_temp_add; 
+    temp                    = {ICACHE_rdata[7:0], ICACHE_rdata[15:8], ICACHE_rdata[23:16], ICACHE_rdata[31:24]}; 
+    IF_inst_w               = temp;
+    IF_BrPre_w              = (IF_B)? IF_BrPre : IF_BrPre_r;
+    IF_B_w                  = IF_B;
+    DecompIn                = 16'd0;
+    RVC_buffer_w            = 16'd0;
+    buffer_valid_w          = 1'b0;
+
+    /////////////////// Hazard first !!! //////////////////
 
     // Case1: D$,I$ stall or Load-use hazard
     if(stall | hazard) begin
@@ -624,12 +657,15 @@ always@(*) begin
         IF_branch_always_addr_w = IF_branch_always_addr_r; 
         IF_BrPre_w = IF_BrPre_r;
         IF_B_w = IF_B_r;
+        RVC_buffer_w = RVC_buffer_r;
+        buffer_valid_w = buffer_valid_r;
     end 
 
     // Case2: Branch predict wrong -> need to flush IF, and jump to right address
     else if (brahcn_wrong) begin
         PC_w = branch_addr;
         IF_valid_w = 1'b0;
+        buffer_valid_w = 1'b0;
         // IF_BrPre_w = 1'b0 we can use this instead of ID_B & ... for brahcn_wrong;
     end
 
@@ -637,7 +673,41 @@ always@(*) begin
     else if (ID_jump_r) begin
         PC_w = jump_addr;
         IF_valid_w = 1'b0;
+        buffer_valid_w = 1'b0;
     end
+
+    /////////////////// RVC later !!! //////////////////
+
+    // Case1: we have a compress instruction in our buffer
+    else if (buffer_C & buffer_valid_r) begin
+        PC_w = PC_reg;           
+        buffer_valid_w = 1'b0;
+        DecompIn = RVC_buffer_r;
+        IF_inst_w = DecompOut;
+    end
+
+    // Case2: we have a compress instruction in our buffer
+    else if (buffer_I & buffer_valid_r) begin
+        PC_w = PC_reg;                
+        buffer_valid_w = 1'b0;
+        DecompIn = RVC_buffer_r;
+        IF_inst_w = DecompOut;
+    end
+
+    // Case3: buffer not valid, C+C 
+    else if (C2) begin
+        DecompIn = {temp[15:0]};
+        IF_inst_w = DecompOut;  
+
+    end
+
+    // Case4: buffer not valid, C+I 
+    else if (~C2) begin
+
+
+
+    end
+    // Case5: other, just I !!! (in our default :)
 
 end
 

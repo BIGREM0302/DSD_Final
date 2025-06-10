@@ -46,7 +46,7 @@ module boothmul_tb;
             debug;
         end
         else
-            $display("✅ PASS: a = %0d, b = %0d → result = %0d", a, b, m);
+            $display("✅ PASS: a = %h, b = %h → result = %h", a, b, m);
     end
     endtask
 
@@ -62,12 +62,10 @@ module boothmul_tb;
         $display("=== BoothMul Unsigned Test ===");
 
         // Basic unsigned test cases
-        run_test(0, 0);
-        run_test(1, 1);
-        run_test(2, 3);
-        run_test(1000, 2048);
-        run_test(32'hFFFFFFFF, 1);         // max unsigned
-        run_test(65535, 65535);            // 16-bit max * 16-bit max
+        run_test(32'hB04955A2, 32'hE0541ECE);         // max unsigned
+        run_test(32'hADBEADDE, 32'h0138D5A0);
+        run_test(32'h48209B17, 32'hE35DFF62);
+        run_test(32'h01563709, 32'hF1A959DC);      // 16-bit max * 16-bit max
 
         // Random unsigned test
         for (i = 0; i < 10; i = i + 1) begin

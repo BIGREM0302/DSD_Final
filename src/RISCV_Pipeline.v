@@ -582,11 +582,11 @@ assign brahcn_wrong          = ID_B & ((branch & (~IF_BrPre_r)) | (IF_BrPre_r & 
 assign ID_B                  = IF_B_r;
 
 // we need to debug this !!! branch / load hazard
-assign ID_rs1_br             = (IF_inst_r[19:15] == ID_rd_r  && ID_Reg_write_r  && ID_rd_r  != 5'd0)? EX_out_w : 
-                               (IF_inst_r[19:15] == EX_rd_r  && EX_Reg_write_r  && EX_rd_r  != 5'd0)? MEM_alu_out_w :
+assign ID_rs1_br             = (IF_inst_r[19:15] == ID_rd_r  && ID_Reg_write_r  && ID_rd_r  != 5'd0 && ID_mul_r != 1'b1)? EX_out_w : 
+                               (IF_inst_r[19:15] == EX_rd_r  && EX_Reg_write_r  && EX_rd_r  != 5'd0 && EX_mul_r != 1'b1)? MEM_alu_out_w :
                                (IF_inst_r[19:15] == MEM_rd_r && MEM_Reg_write_r && MEM_rd_r != 5'd0)? WB_out_w : RF_r[{IF_inst_r[19:15]}];
-assign ID_rs2_br             = (IF_inst_r[24:20] == ID_rd_r  && ID_Reg_write_r  && ID_rd_r  != 5'd0)? EX_out_w : 
-                               (IF_inst_r[24:20] == EX_rd_r  && EX_Reg_write_r  && EX_rd_r  != 5'd0)? MEM_alu_out_w :
+assign ID_rs2_br             = (IF_inst_r[24:20] == ID_rd_r  && ID_Reg_write_r  && ID_rd_r  != 5'd0 && ID_mul_r != 1'b1)? EX_out_w : 
+                               (IF_inst_r[24:20] == EX_rd_r  && EX_Reg_write_r  && EX_rd_r  != 5'd0 && EX_mul_r != 1'b1)? MEM_alu_out_w :
                                (IF_inst_r[24:20] == MEM_rd_r && MEM_Reg_write_r && MEM_rd_r != 5'd0)? WB_out_w : RF_r[{IF_inst_r[24:20]}];
 assign hazard = (ID_mem_to_reg_r | ID_mul_r ) && ((ID_rs1_addr_w == ID_rd_r) || (ID_rs2_addr_w == ID_rd_r));
 assign jump_addr = alu_result;
@@ -736,6 +736,9 @@ always@(*) begin
         7'b0110011: begin   
             Reg_write   = 1;
             alu_ctrl    = (IF_inst_r[30])? 4'd3 : {1'b0, IF_inst_r[14:12]};
+            if(IF_inst_r[25])begin
+                mul       = 1; 
+            end
         end
 
         // (case 2) I: addi, andi, ori, xori, slti, slli, srli, srai
@@ -792,12 +795,6 @@ always@(*) begin
             ALU_src   = 1;
             immediate = {{12{IF_inst_r[31]}},IF_inst_r[19:12],IF_inst_r[20],IF_inst_r[30:21],1'b0};
             alu_ctrl    = 4'd0;
-        end
-
-        // (case 8) M: Mul
-        7'b0000001: begin
-            Reg_write = 1; 
-            mul       = 1;      
         end
 
     endcase
@@ -862,7 +859,7 @@ BoothMul mul_u(
 always @(*) begin
     forwardA = 2'b00;
     forwardB = 2'b00;
-    if (EX_Reg_write_r && EX_rd_r!=5'd0) begin
+    if (EX_Reg_write_r && EX_rd_r!=5'd0 && EX_mul_r != 1'b1) begin
         if (EX_rd_r==ID_rs1_addr_r) forwardA = 2'b10;
         if (EX_rd_r==ID_rs2_addr_r) forwardB = 2'b10;
     end

@@ -588,7 +588,6 @@ wire IF_BrPre_container;
 wire IF_BrPre;
 reg  IF_BrPre_w, IF_BrPre_r;
 reg  IF_B_w, IF_B_r;
-reg  IF_C;
 reg  IF_C_w, IF_C_r;
 
 // Compress instruction
@@ -697,11 +696,6 @@ assign IF_immediate = {{20{IF_inst_w[31]}},IF_inst_w[7],IF_inst_w[30:25],IF_inst
 assign IF_B = (IF_inst_w[6:0] == 7'b1100011); 
 assign IF_BrPre = IF_BrPre_container & IF_B;
 
-assign C2 = temp[1:0] != 2'b11;
-assign buffer_I = (RVC_buffer_r[1:0] == 2'b11);
-assign buffer_C = (RVC_buffer_r[1:0] != 2'b11);
-
-
 assign branch                = (beq & (zero)) | (bne & (~zero));
 assign branch_addr           = (IF_BrPre_r)? IF_pc_plus_four_r : IF_branch_always_addr_r; // jump back or jump to target !
 assign brahcn_wrong          = ID_B & ((branch & (~IF_BrPre_r)) | (IF_BrPre_r & (~branch)));
@@ -780,25 +774,26 @@ always@(*) begin
     end
 
     /////////////////// RVC later !!! //////////////////
+    else if (buffer_valid_r == 1'b1) begin
+        PC_temp_add             = PC_reg;
+        IF_branch_always_addr_w = $signed(PC_reg) + $signed(IF_immediate) - $signed(32'd4) ;
+        IF_inst_w               = {temp[15:0], RVC_buffer_r};
+    end
+    
     else if (PC_reg[1:0] == 2'b10) begin
-        PC_temp_add             = $signed(PC_reg) + $signed(32'd2);
         if (temp[17:16] == 2'b11) begin
+            PC_temp_add             = $signed(PC_reg) + $signed(32'd4);
             RVC_buffer_w   = temp[31:16];
             buffer_valid_w = 1'b1;
             IF_valid_w     = 1'b0;
-            IF_C_w  = IF_C_r;
         end
 
         else begin
+            PC_temp_add             = $signed(PC_reg) + $signed(32'd2);
             DecompIn       = temp[31:16];
             IF_inst_w      = DecompOut;
             IF_C_w           = 1;
         end
-    end
-
-    else if (buffer_valid_r == 1'b1) begin
-        PC_temp_add             = $signed(PC_reg) + $signed(32'd2);
-        IF_inst_w               = {temp[15:0], RVC_buffer_r};
     end
 
     else if (temp[1:0] != 2'b11) begin

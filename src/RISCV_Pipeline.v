@@ -428,6 +428,118 @@ end
 
 endmodule
 
+module decompressor (
+    input  wire [15:0] c,
+    output reg  [31:0] r
+);
+    wire [2:0] funct3;
+    wire [1:0] op;
+
+    assign funct3 = c[15:13];
+    assign op     = c[1:0];
+
+    // For C0-LW, SW
+    wire [ 4:0] C0rs1;
+    wire [ 4:0] C0rs2rd;
+    wire [11:0] C0imm;
+
+    assign C0rs1   = {2'b01, c[9:7]};
+    assign C0rs2rd = {2'b01, c[4:2]};
+    assign C0imm   = {5'd0, c[5], c[12:10], c[6], 2'd0};
+
+    // For C1-NOP, ADDI, C2-SLLI
+    wire [ 4:0] C1Ars1rd;
+    wire [11:0] C1Aimm;
+    assign C1Ars1rd = c[11:7];
+    assign C1Aimm   = {{7{c[12]}}, c[6:2]};
+
+    // For C1-JAL, J
+    wire [20:0] C1Jimm;
+    assign C1Jimm = {{10{c[12]}}, c[8], c[10:9], c[6], c[7], c[2], c[11], c[5:3], 1'b0};
+
+    // For C1-SRLI, SRAI, ANDI, BEQZ, BNEZ
+    wire [ 4:0] C1Srs1rd;
+    wire [11:0] C1Simm;
+    assign C1Srs1rd = {2'b01, c[9:7]};
+    assign C1Simm   = {{7{c[12]}}, c[6:2]};
+
+    // For C1-BEQZ, BNEZ
+    wire [12:0] C1Bimm;
+    assign C1Bimm = {{5{c[12]}}, c[6:5], c[2], c[11:10], c[4:3], 1'b0};
+
+    // For C2-JR, JALR, MV, ADD
+    wire [4:0] C2rs1rd;
+    wire [4:0] C2rs2;
+    assign C2rs1rd = c[11:7];
+    assign C2rs2   = c[6:2];
+
+    always @(*) begin
+        r = {12'd0, 5'd0, 3'b000, 5'd0, 7'b0010011}; // Default to NOP
+        case (op)
+            2'b00: begin
+                case (funct3)
+                    3'b010: begin // LW
+                        r = {C0imm, C0rs1, 3'b010, C0rs2rd, 7'b0000011};
+                    end
+                    3'b110: begin // SW
+                        r = {C0imm[11:5], C0rs2rd, C0rs1, 3'b010, C0imm[4:0], 7'b0100011};
+                    end
+                endcase
+            end
+            2'b01: begin
+                case (funct3)
+                    3'b000: // ADDI, NOP
+                        r = {C1Aimm, C1Ars1rd, 3'b000, C1Ars1rd, 7'b0010011};
+                    3'b001: // JAL
+                        r = {C1Jimm[20], C1Jimm[10:1], C1Jimm[11], C1Jimm[19:12], 5'd1, 7'b1101111};
+                    3'b100: // ANDI, SRLI, SRAI
+                        case (c[11:10])
+                            2'b00: begin // SRLI
+                                r = {7'b0000000, C1Simm[4:0], C1Srs1rd, 3'b101, C1Srs1rd, 7'b0010011};
+                            end
+                            2'b01: begin // SRAI
+                                r = {7'b0100000, C1Simm[4:0], C1Srs1rd, 3'b101, C1Srs1rd, 7'b0010011};
+                            end
+                            2'b10: begin // ANDI
+                                r = {C1Simm, C1Srs1rd, 3'b111, C1Srs1rd, 7'b0010011};
+                            end
+                        endcase
+                    3'b101: begin // J
+                        r = {C1Jimm[20], C1Jimm[10:1], C1Jimm[11], C1Jimm[19:12], 5'd0, 7'b1101111};
+                    end
+                    3'b110: begin // BEQZ
+                        r = {C1Bimm[12], C1Bimm[10:5], 5'd0, C1Srs1rd, 3'b000, C1Bimm[4:1], C1Bimm[11], 7'b1100011};
+                    end
+                    3'b111: begin // BNEZ
+                        r = {C1Bimm[12], C1Bimm[10:5], 5'd0, C1Srs1rd, 3'b001, C1Bimm[4:1], C1Bimm[11], 7'b1100011};
+                    end
+                endcase
+            end
+            2'b10: begin
+                case (funct3)
+                    3'b000: // SLLI
+                        r = {7'b0000000, C1Aimm[4:0], C1Ars1rd, 3'b001, C1Ars1rd, 7'b0010011};
+                    3'b100: // JR, JALR, MV, ADD
+                        if (C2rs2 == 5'd0) begin
+                            if (c[12] == 1'b0) begin // JR
+                                r = {11'd0, C2rs1rd, 3'b000, 5'd0, 7'b1100111};
+                            end else begin // JALR
+                                r = {11'd0, C2rs1rd, 3'b000, 5'd1, 7'b1100111};
+                            end
+                        end else begin
+                            if (c[12] == 1'b0) begin // MV
+                                r = {7'b0000000, C2rs2, 5'd0, 3'b000, C2rs1rd, 7'b0110011};
+                            end else begin // ADD
+                                r = {7'b0000000, C2rs2, C2rs1rd, 3'b000, C2rs1rd, 7'b0110011};
+                            end
+                        end
+                endcase
+            end
+        endcase
+    end
+endmodule
+
+
 module RISCV_Pipeline(
     input         clk,
     input         rst_n,
@@ -462,7 +574,7 @@ assign stall = ICACHE_stall || DCACHE_stall;
 /////////////////////////////////////////// IF Stage Variable //////////////////////////////////////////
 
 // Program Counter
-wire signed [31:0] PC_temp_add;
+reg  signed [31:0] PC_temp_add;
 reg  signed [31:0] PC_w, PC_reg;
 reg                IF_valid_w;
 reg  signed [31:0] IF_pc_plus_four_w,IF_pc_plus_four_r;
@@ -476,10 +588,10 @@ wire IF_BrPre_container;
 wire IF_BrPre;
 reg  IF_BrPre_w, IF_BrPre_r;
 reg  IF_B_w, IF_B_r;
+reg  IF_C;
+reg  IF_C_w, IF_C_r;
 
 // Compress instruction
-wire       C1,C2;
-wire       buffer_C, buffer_I;
 reg [31:0] temp;
 reg [15:0] RVC_buffer_w, RVC_buffer_r;
 reg        buffer_valid_w, buffer_valid_r;
@@ -519,7 +631,6 @@ reg         [3:0 ]  ID_alu_ctrl_w             , ID_alu_ctrl_r;
 reg                 ID_jump_w                 , ID_jump_r;
 reg         [31:0]  ID_pc_plus_four_w         , ID_pc_plus_four_r;
 wire signed [31:0]  ID_pc_w;
-assign ID_pc_w = $signed(IF_pc_plus_four_r) - $signed(32'd4);
 
 // Branch, check whether Prediction is correct or wrong ?
 wire                branch;
@@ -575,13 +686,6 @@ reg         [31:0] RF_r [0:31];
 
 /////////////////////////////////////////// Trash :) //////////////////////////////////////////
 
-
-assign PC_temp_add = ((~buffer_valid_r) & C1 & C2)?$signed(PC_reg) + $signed(32'd2):
-
-                     (buffer_valid_r)? $signed(PC_reg) - $signed(32'd2):$signed(PC_reg) + $signed(32'd4);
-
-                     
-
 assign PC = PC_reg; 
 
 assign ICACHE_ren = 1'b1;
@@ -604,6 +708,7 @@ assign brahcn_wrong          = ID_B & ((branch & (~IF_BrPre_r)) | (IF_BrPre_r & 
 assign ID_B                  = IF_B_r;
 
 // we need to debug this !!! branch / load hazard
+assign ID_pc_w = (IF_C_r)?$signed(IF_pc_plus_four_r) - $signed(32'd2):$signed(IF_pc_plus_four_r) - $signed(32'd4);
 assign ID_rs1_br             = (IF_inst_r[19:15] == ID_rd_r  && ID_Reg_write_r  && ID_rd_r  != 5'd0 && ID_mul_r != 1'b1)? EX_out_w : 
                                (IF_inst_r[19:15] == EX_rd_r  && EX_Reg_write_r  && EX_rd_r  != 5'd0 && EX_mul_r != 1'b1)? MEM_alu_out_w :
                                (IF_inst_r[19:15] == MEM_rd_r && MEM_Reg_write_r && MEM_rd_r != 5'd0)? WB_out_w : RF_r[{IF_inst_r[19:15]}];
@@ -634,11 +739,9 @@ decompressor decomp(
 );
 
 always@(*) begin
-
+    PC_temp_add             = $signed(PC_reg) + $signed(32'd4);
     IF_branch_always_addr_w = $signed(PC_reg) + $signed(IF_immediate); 
-    PC_w                    = (IF_BrPre)? IF_branch_always_addr_w : PC_temp_add;
     IF_valid_w              = 1'b1; 
-    IF_pc_plus_four_w       = PC_temp_add; 
     temp                    = {ICACHE_rdata[7:0], ICACHE_rdata[15:8], ICACHE_rdata[23:16], ICACHE_rdata[31:24]}; 
     IF_inst_w               = temp;
     IF_BrPre_w              = (IF_B)? IF_BrPre : IF_BrPre_r;
@@ -646,69 +749,87 @@ always@(*) begin
     DecompIn                = 16'd0;
     RVC_buffer_w            = 16'd0;
     buffer_valid_w          = 1'b0;
+    IF_C_w                  = 1'b0;
 
     /////////////////// Hazard first !!! //////////////////
 
     // Case1: D$,I$ stall or Load-use hazard
     if(stall | hazard) begin
-        PC_w = PC_reg; 
-        IF_pc_plus_four_w = IF_pc_plus_four_r;
         IF_inst_w = IF_inst_r; 
         IF_branch_always_addr_w = IF_branch_always_addr_r; 
         IF_BrPre_w = IF_BrPre_r;
         IF_B_w = IF_B_r;
         RVC_buffer_w = RVC_buffer_r;
         buffer_valid_w = buffer_valid_r;
+        IF_C_w  = IF_C_r;
     end 
 
     // Case2: Branch predict wrong -> need to flush IF, and jump to right address
     else if (brahcn_wrong) begin
-        PC_w = branch_addr;
         IF_valid_w = 1'b0;
         buffer_valid_w = 1'b0;
+        IF_C_w  = IF_C_r;
         // IF_BrPre_w = 1'b0 we can use this instead of ID_B & ... for brahcn_wrong;
     end
 
     // Case3: Jal/Jalr -> need to flush IF,ID
     else if (ID_jump_r) begin
-        PC_w = jump_addr;
         IF_valid_w = 1'b0;
         buffer_valid_w = 1'b0;
+        IF_C_w  = IF_C_r;
     end
 
     /////////////////// RVC later !!! //////////////////
+    else if (PC_reg[1:0] == 2'b10) begin
+        PC_temp_add             = $signed(PC_reg) + $signed(32'd2);
+        if (temp[17:16] == 2'b11) begin
+            RVC_buffer_w   = temp[31:16];
+            buffer_valid_w = 1'b1;
+            IF_valid_w     = 1'b0;
+            IF_C_w  = IF_C_r;
+        end
 
-    // Case1: we have a compress instruction in our buffer
-    else if (buffer_C & buffer_valid_r) begin
-        PC_w = PC_reg;           
-        buffer_valid_w = 1'b0;
-        DecompIn = RVC_buffer_r;
-        IF_inst_w = DecompOut;
+        else begin
+            DecompIn       = temp[31:16];
+            IF_inst_w      = DecompOut;
+            IF_C_w           = 1;
+        end
     end
 
-    // Case2: we have a compress instruction in our buffer
-    else if (buffer_I & buffer_valid_r) begin
-        PC_w = PC_reg;                
-        buffer_valid_w = 1'b0;
-        DecompIn = RVC_buffer_r;
-        IF_inst_w = DecompOut;
+    else if (buffer_valid_r == 1'b1) begin
+        PC_temp_add             = $signed(PC_reg) + $signed(32'd2);
+        IF_inst_w               = {temp[15:0], RVC_buffer_r};
     end
 
-    // Case3: buffer not valid, C+C 
-    else if (C2) begin
-        DecompIn = {temp[15:0]};
-        IF_inst_w = DecompOut;  
-
+    else if (temp[1:0] != 2'b11) begin
+        PC_temp_add             = $signed(PC_reg) + $signed(32'd2);
+        DecompIn                = temp[15:0];
+        IF_inst_w               = DecompOut;
+        IF_C_w                    = 1;
     end
 
-    // Case4: buffer not valid, C+I 
-    else if (~C2) begin
+end
 
+always@(*) begin
+    PC_w                    = (IF_BrPre)? IF_branch_always_addr_w : PC_temp_add;
+    IF_pc_plus_four_w       = PC_temp_add; 
+    /////////////////// Hazard first !!! //////////////////
 
+    // Case1: D$,I$ stall or Load-use hazard
+    if(stall | hazard) begin
+        PC_w = PC_reg; 
+        IF_pc_plus_four_w = IF_pc_plus_four_r;
+    end 
 
+    // Case2: Branch predict wrong -> need to flush IF, and jump to right address
+    else if (brahcn_wrong) begin
+        PC_w = branch_addr;
     end
-    // Case5: other, just I !!! (in our default :)
 
+    // Case3: Jal/Jalr -> need to flush IF,ID
+    else if (ID_jump_r) begin
+        PC_w = jump_addr;
+    end
 end
 
 always@(posedge clk) begin
@@ -720,6 +841,9 @@ always@(posedge clk) begin
         IF_branch_always_addr_r <= 32'd0;
         IF_BrPre_r <= 1'b0; 
         IF_B_r <= 1'b0; 
+        RVC_buffer_r <= 16'd0;
+        buffer_valid_r <= 1'b0;
+        IF_C_r <= 1'b0;
     end 
 
     else if (!IF_valid_w) begin
@@ -729,6 +853,9 @@ always@(posedge clk) begin
         IF_branch_always_addr_r <= 32'd0;
         IF_BrPre_r <= IF_BrPre_w;
         IF_B_r <= IF_B_w; 
+        RVC_buffer_r <= RVC_buffer_w;
+        buffer_valid_r <= buffer_valid_w;
+        IF_C_r <= IF_C_w;
     end
 
     else begin
@@ -738,6 +865,9 @@ always@(posedge clk) begin
         IF_branch_always_addr_r <= IF_branch_always_addr_w; 
         IF_BrPre_r <= IF_BrPre_w; 
         IF_B_r <= IF_B_w; 
+        RVC_buffer_r <= RVC_buffer_w;
+        buffer_valid_r <= buffer_valid_w;
+        IF_C_r <= IF_C_w;
     end
 
 end

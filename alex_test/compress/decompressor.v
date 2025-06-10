@@ -49,7 +49,7 @@ module decompressor (
             2'b00: begin
                 case (funct3)
                     3'b010: begin // LW
-                        r = {C0imm, C0rs1, 5'b010, C0rs2rd, 7'b0000011};
+                        r = {C0imm, C0rs1, 3'b010, C0rs2rd, 7'b0000011};
                     end
                     3'b110: begin // SW
                         r = {C0imm[11:5], C0rs2rd, C0rs1, 3'b010, C0imm[4:0], 7'b0100011};

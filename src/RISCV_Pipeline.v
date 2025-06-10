@@ -105,8 +105,10 @@ reg [63:0] temp6 [0:1];
 // we will test EX : stage1 , MEM: stage 2->3 , WB: stage 4->5->6
 // so that we need to mannually give "hazard" for those who can't use forwarding to rescue
 
-reg [63:0] temp2_w,temp2_r [0:7];
-reg [63:0] temp4_w,temp4_r [0:3];
+reg [63:0] temp2_w [0:7];
+reg [63:0] temp2_r [0:7];
+reg [63:0] temp4_w [0:3];
+reg [63:0] temp4_r [0:3];
 
 reg overflow;
 
@@ -406,10 +408,10 @@ always@(posedge clk) begin
 
     if(!rst_n) begin
         for (i = 0; i < 8; i = i + 1) begin
-            temp2_w[i] = 64'd0;
+            temp2_r[i] <= 64'd0;
         end
         for (i = 0; i < 4; i = i + 1) begin
-            temp4_w[i] = 64'd0;
+            temp4_r[i] <= 64'd0;
         end
     end 
 

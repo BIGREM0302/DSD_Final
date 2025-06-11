@@ -707,19 +707,13 @@ assign branch_addr           = (IF_BrPre_r)? IF_pc_plus_four_r : IF_branch_alway
 assign brahcn_wrong          = ID_B & ((branch & (~IF_BrPre_r)) | (IF_BrPre_r & (~branch)));
 assign ID_B                  = IF_B_r;
 
-wire  signed [31:0] EX_help;
-assign EX_help = (ID_jump_r)? ID_pc_plus_four_r : alu_result;
-
 // we need to debug this !!! branch / load hazard
 assign ID_pc_w = (IF_C_r)?$signed(IF_pc_plus_four_r) - $signed(32'd2):$signed(IF_pc_plus_four_r) - $signed(32'd4);
-assign ID_rs1_br             = (IF_inst_r[19:15] == ID_rd_r  && ID_Reg_write_r  && ID_rd_r  != 5'd0 && ID_mul_r != 1'b1)? EX_help : 
-                               (IF_inst_r[19:15] == EX_rd_r  && EX_Reg_write_r  && EX_rd_r  != 5'd0 && EX_mul_r != 1'b1)? EX_out_r :
+assign ID_rs1_br             = (IF_inst_r[19:15] == EX_rd_r  && EX_Reg_write_r  && EX_rd_r  != 5'd0 && EX_mul_r != 1'b1)? EX_out_r :
                                (IF_inst_r[19:15] == MEM_rd_r && MEM_Reg_write_r && MEM_rd_r != 5'd0)? WB_out_w : RF_r[{IF_inst_r[19:15]}];
-assign ID_rs2_br             = (IF_inst_r[24:20] == ID_rd_r  && ID_Reg_write_r  && ID_rd_r  != 5'd0 && ID_mul_r != 1'b1)? EX_help : 
-                               (IF_inst_r[24:20] == EX_rd_r  && EX_Reg_write_r  && EX_rd_r  != 5'd0 && EX_mul_r != 1'b1)? EX_out_r :
+assign ID_rs2_br             = (IF_inst_r[24:20] == EX_rd_r  && EX_Reg_write_r  && EX_rd_r  != 5'd0 && EX_mul_r != 1'b1)? EX_out_r :
                                (IF_inst_r[24:20] == MEM_rd_r && MEM_Reg_write_r && MEM_rd_r != 5'd0)? WB_out_w : RF_r[{IF_inst_r[24:20]}];
-
-assign hazard = (ID_mem_to_reg_r | ID_mul_r) && ((ID_rs1_addr_w == ID_rd_r) || (ID_rs2_addr_w == ID_rd_r)) && (ID_rd_r != 5'd0);
+assign hazard = (ID_mem_to_reg_r | ID_mul_r | ID_B ) && ((ID_rs1_addr_w == ID_rd_r) || (ID_rs2_addr_w == ID_rd_r)) && (ID_rd_r != 5'd0);
 assign jump_addr = alu_result;
 assign MEM_wdata = EX_rs2_r; // SW use rs2
 assign WB_out_w = (MEM_mem_to_reg_r)? MEM_rdata_r : 
@@ -1092,7 +1086,7 @@ always@(*) begin
     EX_mem_wen_D_w = ID_mem_wen_D_r; 
     EX_Reg_write_w = ID_Reg_write_r;
     EX_mul_w = ID_mul_r;
-    EX_out_w = EX_help; // jump address (PC+4) or other ALU result
+    EX_out_w = (ID_jump_r)? ID_pc_plus_four_r : alu_result; // jump address (PC+4) or other ALU result
     EX_rs2_w = rs2_val; // Forward rs2 value, need to use it for SW
 
     if(stall) begin

@@ -703,13 +703,11 @@ assign ID_B                  = IF_B_r;
 
 // we need to debug this !!! branch / load hazard
 assign ID_pc_w = (IF_C_r)?$signed(IF_pc_plus_four_r) - $signed(32'd2):$signed(IF_pc_plus_four_r) - $signed(32'd4);
-assign ID_rs1_br             = (IF_inst_r[19:15] == ID_rd_r  && ID_Reg_write_r  && ID_rd_r  != 5'd0 && ID_mul_r != 1'b1)? EX_out_w : 
-                               (IF_inst_r[19:15] == EX_rd_r  && EX_Reg_write_r  && EX_rd_r  != 5'd0 && EX_mul_r != 1'b1)? MEM_alu_out_w :
+assign ID_rs1_br             = (IF_inst_r[19:15] == EX_rd_r  && EX_Reg_write_r  && EX_rd_r  != 5'd0 && EX_mul_r != 1'b1)? MEM_alu_out_w :
                                (IF_inst_r[19:15] == MEM_rd_r && MEM_Reg_write_r && MEM_rd_r != 5'd0)? WB_out_w : RF_r[{IF_inst_r[19:15]}];
-assign ID_rs2_br             = (IF_inst_r[24:20] == ID_rd_r  && ID_Reg_write_r  && ID_rd_r  != 5'd0 && ID_mul_r != 1'b1)? EX_out_w : 
-                               (IF_inst_r[24:20] == EX_rd_r  && EX_Reg_write_r  && EX_rd_r  != 5'd0 && EX_mul_r != 1'b1)? MEM_alu_out_w :
+assign ID_rs2_br             = (IF_inst_r[24:20] == EX_rd_r  && EX_Reg_write_r  && EX_rd_r  != 5'd0 && EX_mul_r != 1'b1)? MEM_alu_out_w :
                                (IF_inst_r[24:20] == MEM_rd_r && MEM_Reg_write_r && MEM_rd_r != 5'd0)? WB_out_w : RF_r[{IF_inst_r[24:20]}];
-assign hazard = (ID_mem_to_reg_r | ID_mul_r ) && ((ID_rs1_addr_w == ID_rd_r) || (ID_rs2_addr_w == ID_rd_r));
+assign hazard = (ID_mem_to_reg_r | ID_mul_r | ID_B ) && ((ID_rs1_addr_w == ID_rd_r) || (ID_rs2_addr_w == ID_rd_r)) && (ID_rd_r != 5'd0);
 assign jump_addr = alu_result;
 assign MEM_wdata = EX_rs2_r; // SW use rs2
 assign WB_out_w = (MEM_mem_to_reg_r)? MEM_rdata_r : 

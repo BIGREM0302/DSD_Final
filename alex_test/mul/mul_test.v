@@ -27,8 +27,8 @@ reg [63:0] temp6 [0:1];
 
 reg [63:0] temp2_w [0:7];
 reg [63:0] temp2_r [0:7];
-reg [63:0] temp4_w [0:3];
-reg [63:0] temp4_r [0:3];
+reg [63:0] temp5_w [0:2];
+reg [63:0] temp5_r [0:2];
 
 reg overflow;
 
@@ -265,20 +265,20 @@ always@(*) begin
     j = 0;
     for(i = 0; i < 64; i = i + 1) begin
         if( i < 6 )begin
-            temp5[2*j][i] = temp4_r[3*j][i];
+            temp5[2*j][i] = temp4[3*j][i];
         end
         else if(i >= 6 && i < 19) begin
-            {temp5[2*j+1][i+1], temp5[2*j][i]} = HA_compress(temp4_r[3*j][i], temp4_r[3*j+1][i]);
+            {temp5[2*j+1][i+1], temp5[2*j][i]} = HA_compress(temp4[3*j][i], temp4[3*j+1][i]);
         end
         else if (i == 63) begin
-            {overflow, temp5[(2*j)][i]} = FA_compress(temp4_r[3*j][i], temp4_r[3*j+1][i], temp4_r[3*j+2][i]);
+            {overflow, temp5[(2*j)][i]} = FA_compress(temp4[3*j][i], temp4[3*j+1][i], temp4[3*j+2][i]);
         end
         else begin
-            {temp5[(2*j+1)][i+1], temp5[(2*j)][i]} = FA_compress(temp4_r[3*j][i], temp4_r[3*j+1][i], temp4_r[3*j+2][i]);
+            {temp5[(2*j+1)][i+1], temp5[(2*j)][i]} = FA_compress(temp4_r[3*j][i], temp4[3*j+1][i], temp4[3*j+2][i]);
         end
     end
     // for 2
-    temp5[2] = temp4_r[3];
+    temp5[2] = temp4[3];
 
 // ================================== stage 6 ==========================================================
     for (i = 0; i < 2; i = i + 1)begin
@@ -288,16 +288,16 @@ always@(*) begin
     j = 0;
     for(i = 0; i < 64; i = i + 1) begin
         if( i < 7 )begin
-            temp6[2*j][i] = temp5[3*j][i];
+            temp6[2*j][i] = temp5_r[3*j][i];
         end
         else if(i >= 7 && i < 28) begin
-            {temp6[2*j+1][i+1], temp6[2*j][i]} = HA_compress(temp5[3*j][i], temp5[3*j+1][i]);
+            {temp6[2*j+1][i+1], temp6[2*j][i]} = HA_compress(temp5_r[3*j][i], temp5_r[3*j+1][i]);
         end
         else if (i == 63) begin
-            {overflow, temp6[(2*j)][i]} = FA_compress(temp5[3*j][i], temp5[3*j+1][i], temp5[3*j+2][i]);
+            {overflow, temp6[(2*j)][i]} = FA_compress(temp5[3*j][i], temp5_r[3*j+1][i], temp5_r[3*j+2][i]);
         end
         else begin
-            {temp6[(2*j+1)][i+1], temp6[(2*j)][i]} = FA_compress(temp5[3*j][i], temp5[3*j+1][i], temp5[3*j+2][i]);
+            {temp6[(2*j+1)][i+1], temp6[(2*j)][i]} = FA_compress(temp5_r[3*j][i], temp5_r[3*j+1][i], temp5_r[3*j+2][i]);
         end
     end
 end
@@ -308,8 +308,8 @@ always@(*) begin
             temp2_w[i] = temp2_r[i];
         end
         
-        for (i = 0; i < 4; i = i + 1) begin
-            temp4_w[i] = temp4_r[i];
+        for (i = 0; i < 3; i = i + 1) begin
+            temp5_w[i] = temp5_r[i];
         end
     end
 
@@ -318,8 +318,8 @@ always@(*) begin
             temp2_w[i] = temp2[i];
         end
 
-        for (i = 0; i < 4; i = i + 1) begin
-            temp4_w[i] = temp4[i];
+        for (i = 0; i < 3; i = i + 1) begin
+            temp5_w[i] = temp5[i];
         end
     end
 end
@@ -330,8 +330,8 @@ always@(posedge clk) begin
         for (i = 0; i < 8; i = i + 1) begin
             temp2_r[i] <= 64'd0;
         end
-        for (i = 0; i < 4; i = i + 1) begin
-            temp4_r[i] <= 64'd0;
+        for (i = 0; i < 3; i = i + 1) begin
+            temp5_r[i] <= 64'd0;
         end
     end 
 
@@ -340,8 +340,8 @@ always@(posedge clk) begin
             temp2_r[i] <= temp2_w[i];
         end
 
-        for (i = 0; i < 4; i = i + 1) begin
-            temp4_r[i] <= temp4_w[i];
+        for (i = 0; i < 3; i = i + 1) begin
+            temp5_r[i] <= temp5_w[i];
         end
     end
 end

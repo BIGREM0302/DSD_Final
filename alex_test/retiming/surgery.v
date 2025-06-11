@@ -692,7 +692,13 @@ assign ICACHE_wen = 1'b0;
 assign ICACHE_addr = PC_reg[31:2];
 assign ICACHE_wdata = 32'd0; 
 
-assign IF_immediate = {{20{IF_inst_w[31]}},IF_inst_w[7],IF_inst_w[30:25],IF_inst_w[11:8],1'b0};
+wire [31:0] IF_combine;
+assign IF_combine = {temp[15:0], RVC_buffer_r};
+
+assign IF_immediate = (buffer_valid_r == 1'b1)? {{20{IF_combine[31]}},IF_combine[7],IF_combine[30:25],IF_combine[11:8],1'b0}:
+                      (((PC_reg[1:0] == 2'b10)&&(temp[17:16] != 2'b11))||(temp[1:0] != 2'b11))? {{20{DecompOut[31]}},DecompOut[7],DecompOut[30:25],DecompOut[11:8],1'b0}:{{20{IF_inst_w[31]}},IF_inst_w[7],IF_inst_w[30:25],IF_inst_w[11:8],1'b0};
+                      
+
 assign IF_B = (IF_inst_w[6:0] == 7'b1100011); 
 assign IF_BrPre = IF_BrPre_container & IF_B;
 
@@ -703,9 +709,9 @@ assign ID_B                  = IF_B_r;
 
 // we need to debug this !!! branch / load hazard
 assign ID_pc_w = (IF_C_r)?$signed(IF_pc_plus_four_r) - $signed(32'd2):$signed(IF_pc_plus_four_r) - $signed(32'd4);
-assign ID_rs1_br             = (IF_inst_r[19:15] == EX_rd_r  && EX_Reg_write_r  && EX_rd_r  != 5'd0 && EX_mul_r != 1'b1)? MEM_alu_out_w :
+assign ID_rs1_br             = (IF_inst_r[19:15] == EX_rd_r  && EX_Reg_write_r  && EX_rd_r  != 5'd0 && EX_mul_r != 1'b1)? EX_out_r :
                                (IF_inst_r[19:15] == MEM_rd_r && MEM_Reg_write_r && MEM_rd_r != 5'd0)? WB_out_w : RF_r[{IF_inst_r[19:15]}];
-assign ID_rs2_br             = (IF_inst_r[24:20] == EX_rd_r  && EX_Reg_write_r  && EX_rd_r  != 5'd0 && EX_mul_r != 1'b1)? MEM_alu_out_w :
+assign ID_rs2_br             = (IF_inst_r[24:20] == EX_rd_r  && EX_Reg_write_r  && EX_rd_r  != 5'd0 && EX_mul_r != 1'b1)? EX_out_r :
                                (IF_inst_r[24:20] == MEM_rd_r && MEM_Reg_write_r && MEM_rd_r != 5'd0)? WB_out_w : RF_r[{IF_inst_r[24:20]}];
 assign hazard = (ID_mem_to_reg_r | ID_mul_r | ID_B ) && ((ID_rs1_addr_w == ID_rd_r) || (ID_rs2_addr_w == ID_rd_r)) && (ID_rd_r != 5'd0);
 assign jump_addr = alu_result;
@@ -1064,11 +1070,11 @@ end
 
 assign rs1_val = (forwardA==2'b00) ? ID_rs1_r : 
                  (forwardA==2'b01) ? WB_out_w : 
-                 (forwardA==2'b10) ? MEM_alu_out_w : 32'd0;
+                 (forwardA==2'b10) ? EX_out_r : 32'd0;
 
 assign rs2_val = (forwardB==2'b00) ? ID_rs2_r :
                  (forwardB==2'b01) ? WB_out_w : 
-                 (forwardB==2'b10) ? MEM_alu_out_w : 32'd0;
+                 (forwardB==2'b10) ? EX_out_r : 32'd0;
 
 // Get correct ALU operands
 assign EX_op1 = rs1_val; 
@@ -1164,7 +1170,7 @@ end
 ////////////////////////// WB Stage //////////////////////////
 integer i;
 always@(posedge clk) begin
-    if (!RST_n) begin
+    if (!RST_n) begin 
         // Reset register file to zero
         for (i = 0; i < 32; i = i + 1) begin
             RF_r[i] <= 32'd0;

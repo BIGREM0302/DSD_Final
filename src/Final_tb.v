@@ -3,7 +3,7 @@
 
 `timescale 1 ns/10 ps
 
-`define CYCLE 3.49 // You can modify your clock frequency
+`define CYCLE 3.5 // You can modify your clock frequency
 `define MAX_CYCLES 10000000 // Max cycle count to stop the simulaiton. You can modify it
 
 `define SDFFILE   "./Netlist/CHIP_syn.sdf"	// Modify your SDF file name
